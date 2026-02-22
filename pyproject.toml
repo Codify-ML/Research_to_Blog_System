@@ -1,0 +1,32 @@
+[project]
+name = "research-to-blog-system"
+version = "0.1.0"
+description = "Phase 1 scaffold for a multi-agent content pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "langgraph>=0.2.50",
+  "pydantic>=2.9.0",
+  "pydantic-settings>=2.4.0",
+  "typing-extensions>=4.12.2",
+]
+
+[dependency-groups]
+dev = [
+  "black>=24.8.0",
+  "pytest>=8.3.0",
+  "ruff>=0.6.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.black]
+line-length = 79
+
+[tool.ruff]
+line-length = 79
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

@@ -1,0 +1,44 @@
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+    checkpointer: Literal["memory", "postgres"] = "memory"
+
+    # Phase 1 keys (future phases can consume these
+    # without changing the config surface)
+    use_mock_llm: bool = True
+    mock_mode_strict: bool = False
+    openai_api_key: str | None = None
+    openai_model_researcher: str = "gpt-4.1"
+    openai_model_writer: str = "gpt-4.1-mini"
+    openai_model_editor: str = "gpt-4.1-mini"
+
+    redis_url: str = "redis://localhost:6379/0"
+    database_url: str = (
+        "postgresql://postgres:postgres@localhost:5432/research_blog"
+    )
+
+    @model_validator(mode="after")
+    def validate_llm_mode(self) -> "Settings":
+        if not self.use_mock_llm and not self.openai_api_key:
+            raise ValueError(
+                "OPENAI_API_KEY is required when USE_MOCK_LLM is false."
+            )
+        if self.mock_mode_strict and not self.use_mock_llm:
+            raise ValueError(
+                "MOCK_MODE_STRICT cannot be true when USE_MOCK_LLM is false."
+            )
+        return self
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()
