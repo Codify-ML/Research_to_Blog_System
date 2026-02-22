@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql://postgres:postgres@localhost:5432/research_blog"
     )
+    celery_broker_url: str = "redis://localhost:6379/0"
+    celery_result_backend: str = "redis://localhost:6379/1"
+    job_store_path: str = "./var/jobs.db"
+
+    llm_max_retries: int = 3
+    llm_base_backoff_seconds: float = 0.2
+    llm_max_backoff_seconds: float = 2.0
 
     @model_validator(mode="after")
     def validate_llm_mode(self) -> "Settings":

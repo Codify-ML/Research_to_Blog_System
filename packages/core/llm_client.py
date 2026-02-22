@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Protocol
 
+from openai import OpenAI
+
 from packages.core.settings import Settings
 
 
@@ -23,11 +25,29 @@ class OpenAILLMClient:
     api_key: str
 
     def complete(self, *, prompt: str, model: str) -> str:
-        # Phase 2 will replace this stub with real OpenAI API integration.
-        raise NotImplementedError(
-            "OpenAILLMClient is not wired yet. "
-            "Enable USE_MOCK_LLM=true for now, or complete Phase 2 wiring."
+        client = OpenAI(api_key=self.api_key)
+        response = client.responses.create(
+            model=model,
+            input=prompt,
         )
+
+        output_text = getattr(response, "output_text", "")
+        if output_text:
+            return output_text.strip()
+
+        # Fallback for SDK response variants with nested content.
+        try:
+            chunks: list[str] = []
+            for item in response.output:  # type: ignore[attr-defined]
+                for content in item.content:
+                    text = getattr(content, "text", None)
+                    if text:
+                        chunks.append(text)
+            return "\n".join(chunks).strip()
+        except Exception as exc:  # pragma: no cover
+            raise RuntimeError(
+                "OpenAI response did not contain parsable text output."
+            ) from exc
 
 
 def get_llm_client(settings: Settings) -> LLMClient:
