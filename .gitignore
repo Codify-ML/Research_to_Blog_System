@@ -4,3 +4,7 @@ __pycache__/
 .ruff_cache/
 *.pyc
 .env
+.run/
+var/
+dump.rdb
+*.db
