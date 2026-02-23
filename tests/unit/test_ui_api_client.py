@@ -53,6 +53,7 @@ def test_generate_success_maps_response_fields():
             payload={
                 "job_id": "job-123",
                 "status": "PENDING",
+                "llm_mode": "mock",
             },
         )
     )
@@ -62,12 +63,25 @@ def test_generate_success_maps_response_fields():
         session=session,
     )
 
-    result = client.generate("test topic")
+    result = client.generate(
+        topic="test topic",
+        llm_mode="mock",
+        max_sources=6,
+        content_format="Blog article",
+        content_context="",
+        tone="professional",
+        length_preference="balanced",
+        research_depth="standard",
+    )
 
     assert result.job_id == "job-123"
     assert result.status == "PENDING"
+    assert result.llm_mode == "mock"
     assert session.calls[0]["method"] == "POST"
     assert session.calls[0]["url"] == "http://127.0.0.1:8000/generate"
+    assert session.calls[0]["json"]["llm_mode"] == "mock"
+    assert session.calls[0]["json"]["max_sources"] == 6
+    assert session.calls[0]["json"]["research_depth"] == "standard"
 
 
 def test_get_status_maps_payload_and_terminal_property():
@@ -77,11 +91,24 @@ def test_get_status_maps_payload_and_terminal_property():
             payload={
                 "job_id": "job-1",
                 "topic": "topic",
+                "llm_mode": "openai",
+                "research_tools_used": [
+                    "web_search",
+                    "function:normalize_sources",
+                ],
+                "max_sources": 5,
+                "content_format": "LinkedIn post",
+                "content_context": "For engineering leaders.",
+                "tone": "professional",
+                "length_preference": "short",
+                "research_depth": "deep",
                 "status": "COMPLETED",
                 "revision_count": 1,
                 "draft": "final draft",
                 "research_notes": ["n1", "n2"],
                 "editor_feedback": [],
+                "editor_strengths": ["Clear structure."],
+                "editor_weaknesses": ["Could use stronger examples."],
                 "error_message": None,
                 "updated_at": "2026-02-23T00:00:00+00:00",
             },
@@ -96,6 +123,18 @@ def test_get_status_maps_payload_and_terminal_property():
     result = client.get_status("job-1")
 
     assert result.job_id == "job-1"
+    assert result.llm_mode == "openai"
+    assert result.research_tools_used == [
+        "web_search",
+        "function:normalize_sources",
+    ]
+    assert result.max_sources == 5
+    assert result.content_format == "LinkedIn post"
+    assert result.tone == "professional"
+    assert result.length_preference == "short"
+    assert result.research_depth == "deep"
+    assert result.editor_strengths == ["Clear structure."]
+    assert result.editor_weaknesses == ["Could use stronger examples."]
     assert result.research_notes == ["n1", "n2"]
     assert result.is_terminal is True
 
@@ -119,7 +158,16 @@ def test_api_error_raises_contract_aware_exception():
     )
 
     with pytest.raises(ApiClientError) as exc_info:
-        client.generate("queue outage")
+        client.generate(
+            topic="queue outage",
+            llm_mode="mock",
+            max_sources=6,
+            content_format="Blog article",
+            content_context="",
+            tone="professional",
+            length_preference="balanced",
+            research_depth="standard",
+        )
 
     exc = exc_info.value
     assert exc.status_code == 503

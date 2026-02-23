@@ -20,6 +20,7 @@ pipeline.
 - Streamlit UI for topic submission and status polling
 - Status panel with lifecycle, notes, feedback, and current draft
 - Terminal-state handling for `COMPLETED`, `FAILED`, and `ESCALATED`
+- Advanced controls for source cap, tone, length, and research depth
 - Unit tests for UI API client and status helpers
 
 ## Prerequisites
@@ -61,9 +62,27 @@ The project supports two execution modes for agent LLM calls:
 - Mock mode (default): `USE_MOCK_LLM=true`
 - Real OpenAI mode: `USE_MOCK_LLM=false` and set `OPENAI_API_KEY`
 
+When using the Phase 3 UI, each submitted job can override runtime mode:
+- `Mock LLM`
+- `OpenAI LLM`
+
 Optional strict safety flag:
 - `MOCK_MODE_STRICT=true` forces mock-only behavior
   (cannot be combined with `USE_MOCK_LLM=false`).
+
+Researcher tool controls:
+- `RESEARCH_WEB_SEARCH_ENABLED=true` enables web search tool availability.
+- `RESEARCH_FUNCTION_TOOLS_ENABLED=true` enables function-calling helpers
+  for source normalization and scoring.
+- Tool usage is still conditional: the researcher only gets tools for
+  topics that appear time-sensitive or freshness-dependent.
+- For freshness-critical topics (for example `now`, `latest`, market/stock
+  prompts), the researcher enforces a recency policy and prefers very recent
+  sources.
+- UI status now shows `research_tools_used` so you can verify if tools were
+  invoked in a run.
+- UI exposes `research_depth` (`light`, `standard`, `deep`) to control how
+  much breadth/depth the Researcher should produce in notes.
 
 ## Key Files
 - `packages/core/settings.py`

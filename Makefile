@@ -6,6 +6,7 @@
 	test \
 	test-unit \
 	test-integration \
+	test-e2e \
 	run-sync \
 	run-api \
 	run-worker \
@@ -40,6 +41,7 @@ help:
 	@echo "  test      Run unit and integration tests"
 	@echo "  test-unit Alias for test"
 	@echo "  test-integration Run integration tests"
+	@echo "  test-e2e  Run UI lifecycle e2e tests"
 	@echo "  run-sync  Run the synchronous Phase 1 graph harness"
 	@echo "  run-api   Run FastAPI server in foreground (Phase 2)"
 	@echo "  run-worker Run Celery worker in foreground (Phase 2)"
@@ -63,13 +65,16 @@ fmt:
 lint:
 	uv run ruff check .
 
-test: test-unit test-integration
+test: test-unit test-integration test-e2e
 
 test-unit:
 	uv run pytest tests/unit
 
 test-integration:
 	uv run pytest tests/integration
+
+test-e2e:
+	uv run pytest tests/e2e
 
 run-sync:
 	@mkdir -p $(RUN_DIR)

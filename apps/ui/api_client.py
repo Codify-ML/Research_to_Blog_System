@@ -25,17 +25,28 @@ class ApiClientError(RuntimeError):
 class GenerateResult:
     job_id: str
     status: str
+    llm_mode: str
 
 
 @dataclass(frozen=True)
 class StatusResult:
     job_id: str
     topic: str
+    llm_mode: str
+    max_sources: int
+    content_format: str
+    content_context: str
+    tone: str
+    length_preference: str
+    research_depth: str
+    research_tools_used: list[str]
     status: str
     revision_count: int
     draft: str
     research_notes: list[str]
     editor_feedback: list[str]
+    editor_strengths: list[str]
+    editor_weaknesses: list[str]
     error_message: str | None
     updated_at: str
 
@@ -56,11 +67,36 @@ class ApiClient:
         self.timeout_seconds = timeout_seconds
         self.session = session or requests.Session()
 
-    def generate(self, topic: str) -> GenerateResult:
-        payload = self._request("POST", "/generate", json={"topic": topic})
+    def generate(
+        self,
+        *,
+        topic: str,
+        llm_mode: str,
+        max_sources: int,
+        content_format: str,
+        content_context: str,
+        tone: str,
+        length_preference: str,
+        research_depth: str,
+    ) -> GenerateResult:
+        payload = self._request(
+            "POST",
+            "/generate",
+            json={
+                "topic": topic,
+                "llm_mode": llm_mode,
+                "max_sources": max_sources,
+                "content_format": content_format,
+                "content_context": content_context,
+                "tone": tone,
+                "length_preference": length_preference,
+                "research_depth": research_depth,
+            },
+        )
         return GenerateResult(
             job_id=str(payload["job_id"]),
             status=str(payload["status"]),
+            llm_mode=str(payload.get("llm_mode", "mock")),
         )
 
     def get_status(self, job_id: str) -> StatusResult:
@@ -68,11 +104,23 @@ class ApiClient:
         return StatusResult(
             job_id=str(payload["job_id"]),
             topic=str(payload["topic"]),
+            llm_mode=str(payload.get("llm_mode", "mock")),
+            max_sources=int(payload.get("max_sources", 6)),
+            content_format=str(payload.get("content_format", "Blog article")),
+            content_context=str(payload.get("content_context", "")),
+            tone=str(payload.get("tone", "professional")),
+            length_preference=str(
+                payload.get("length_preference", "balanced")
+            ),
+            research_depth=str(payload.get("research_depth", "standard")),
+            research_tools_used=list(payload.get("research_tools_used", [])),
             status=str(payload["status"]),
             revision_count=int(payload["revision_count"]),
             draft=str(payload.get("draft", "")),
             research_notes=list(payload.get("research_notes", [])),
             editor_feedback=list(payload.get("editor_feedback", [])),
+            editor_strengths=list(payload.get("editor_strengths", [])),
+            editor_weaknesses=list(payload.get("editor_weaknesses", [])),
             error_message=payload.get("error_message"),
             updated_at=str(payload["updated_at"]),
         )
