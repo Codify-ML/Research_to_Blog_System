@@ -1,0 +1,90 @@
+name: Build And Push Images
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "docker/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/build-and-push-images.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  PROJECT_NAME: vc-blog-agent
+  ENVIRONMENT: dev
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=${GITHUB_SHA::12}" >> "$GITHUB_ENV"
+
+      - name: Build and push API image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          REPO="${PROJECT_NAME}-${ENVIRONMENT}-api"
+          IMAGE="${REGISTRY}/${REPO}:${IMAGE_TAG}"
+          docker build --platform linux/amd64 \
+            -f docker/api.Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Build and push worker image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          REPO="${PROJECT_NAME}-${ENVIRONMENT}-worker"
+          IMAGE="${REGISTRY}/${REPO}:${IMAGE_TAG}"
+          docker build --platform linux/amd64 \
+            -f docker/worker.Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Build and push UI image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          REPO="${PROJECT_NAME}-${ENVIRONMENT}-ui"
+          IMAGE="${REGISTRY}/${REPO}:${IMAGE_TAG}"
+          docker build --platform linux/amd64 \
+            -f docker/ui.Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Publish latest tags on main
+        if: github.ref == 'refs/heads/main'
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          for svc in api worker ui; do
+            REPO="${PROJECT_NAME}-${ENVIRONMENT}-${svc}"
+            docker tag "${REGISTRY}/${REPO}:${IMAGE_TAG}" \
+              "${REGISTRY}/${REPO}:latest"
+            docker push "${REGISTRY}/${REPO}:latest"
+          done

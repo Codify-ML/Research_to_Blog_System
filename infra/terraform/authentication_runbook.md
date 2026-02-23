@@ -1,0 +1,98 @@
+# Authentication Runbook (Dev)
+
+This runbook describes how UI authentication works for the dev environment and
+how to manage access for demo users.
+
+## Architecture
+
+- UI traffic goes through the UI ALB.
+- The UI ALB HTTPS listener enforces `authenticate-cognito`.
+- Unauthenticated users are redirected to Cognito Hosted UI login.
+- After login, ALB forwards requests to the Streamlit UI service.
+
+## Who Can Authenticate
+
+- Only users in the Cognito User Pool created by Terraform.
+- User signup is disabled (`allow_admin_create_user_only = true`).
+- Users are created by admins/operators only.
+
+## Admin Model
+
+- IAM controls who can manage Cognito users.
+- Recommended:
+- Create an IAM group/role for app admins.
+- Grant only required Cognito actions for this specific user pool.
+- Do not share root or broad admin credentials.
+
+## User Lifecycle Operations
+
+Use AWS CLI with your local profile:
+
+```bash
+export AWS_PROFILE=personal-aws-dev
+export AWS_REGION=us-west-2
+```
+
+Discover pool ID (after `terraform apply`):
+
+```bash
+terraform -chdir=infra/terraform/envs/dev output -raw cognito_user_pool_id
+```
+
+### Create User
+
+```bash
+aws cognito-idp admin-create-user \
+  --user-pool-id <POOL_ID> \
+  --username user@example.com \
+  --user-attributes Name=email,Value=user@example.com Name=email_verified,Value=true \
+  --desired-delivery-mediums EMAIL
+```
+
+### Force Password Reset (Optional)
+
+```bash
+aws cognito-idp admin-set-user-password \
+  --user-pool-id <POOL_ID> \
+  --username user@example.com \
+  --password '<StrongTempPassword123!>' \
+  --permanent false
+```
+
+### Disable User
+
+```bash
+aws cognito-idp admin-disable-user \
+  --user-pool-id <POOL_ID> \
+  --username user@example.com
+```
+
+### Re-enable User
+
+```bash
+aws cognito-idp admin-enable-user \
+  --user-pool-id <POOL_ID> \
+  --username user@example.com
+```
+
+### Delete User
+
+```bash
+aws cognito-idp admin-delete-user \
+  --user-pool-id <POOL_ID> \
+  --username user@example.com
+```
+
+## Demo Workflow
+
+1. Apply Terraform.
+2. Create one or more Cognito users (admin action).
+3. Open `https://ui.vc-blog-agent.dev.vc-projects-ds.com`.
+4. User logs in via Cognito Hosted UI.
+5. User reaches Streamlit UI only after successful auth.
+
+## Security Notes
+
+- Keep Cognito admin permissions restricted to a small operator group.
+- Keep OpenAI key in AWS Secrets Manager; do not place it in plain env vars.
+- Keep WAF enabled and tune rate limits as traffic patterns become clear.

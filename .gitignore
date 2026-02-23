@@ -8,3 +8,8 @@ __pycache__/
 var/
 dump.rdb
 *.db
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars

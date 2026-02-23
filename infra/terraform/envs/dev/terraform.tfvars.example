@@ -1,0 +1,32 @@
+# Copy to terraform.tfvars and update for your AWS account.
+
+aws_region  = "us-west-2"
+aws_profile = "personal-aws-dev"
+route53_zone_name = "dev.vc-projects-ds.com"
+route53_zone_id   = "Z03707592Y0NKCCWRSSFL"
+api_hostname      = "api.vc-blog-agent.dev.vc-projects-ds.com"
+ui_hostname       = "ui.vc-blog-agent.dev.vc-projects-ds.com"
+cognito_domain_prefix = "vc-blog-agent-dev-auth"
+enable_https      = true
+enable_ui_auth    = true
+
+# Required for RDS module.
+db_password = "replace-with-strong-password"
+
+# Optional. If empty, create the secret and set value manually afterward.
+openai_api_key = ""
+
+# Network posture for cloud portability.
+enable_nat_gateway = true
+waf_rate_limit     = 2000
+
+# If left empty, Terraform composes image URIs from created ECR repos
+# using `image_tag`.
+api_image    = ""
+worker_image = ""
+ui_image     = ""
+image_tag    = "latest"
+
+# Runtime defaults.
+use_mock_llm     = false
+mock_mode_strict = false
