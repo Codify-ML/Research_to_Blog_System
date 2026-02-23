@@ -72,6 +72,46 @@ for API/worker parity.
 `api` and `worker` load LLM-related variables from local `.env` via
 compose `env_file`, which avoids accidental shell-level key overrides.
 
+### Phase 5 Terraform (dev scaffold)
+```bash
+cp infra/terraform/envs/dev/terraform.tfvars.example \
+  infra/terraform/envs/dev/terraform.tfvars
+make tf-init-dev
+make tf-validate-dev
+make tf-plan-dev
+```
+No Terraform apply is executed automatically.
+Current dev scaffold behavior:
+- S3 backend uses lockfile-based state locking.
+- ECS services are placed in private subnets (no public task IPs).
+- NAT is enabled by default for private egress portability.
+- ECR repositories are provisioned by Terraform, and CI image pipeline
+  is scaffolded in `.github/workflows/build-and-push-images.yml`.
+- Terraform now scaffolds Route53 + ACM HTTPS, UI Cognito login
+  (`authenticate-cognito`), and WAF association for both ALBs.
+
+Cloud image build/deploy workflow (Makefile):
+```bash
+# Build images with an immutable tag
+IMAGE_TAG=$(git rev-parse --short HEAD) make image-build-dev
+
+# Build + push images to ECR
+IMAGE_TAG=$(git rev-parse --short HEAD) make image-push-dev
+
+# Preview infra/service changes with that tag
+IMAGE_TAG=$(git rev-parse --short HEAD) make deploy-plan-dev
+
+# Push images and deploy ECS task definitions with that tag
+IMAGE_TAG=$(git rev-parse --short HEAD) make deploy-dev
+```
+By default, image targets use:
+- `AWS_PROFILE=personal-aws-dev`
+- `AWS_REGION=us-west-2`
+- `AWS_ACCOUNT_ID=497458934978`
+- `PROJECT_NAME=vc-blog-agent`
+- `CLOUD_ENV=dev`
+- `IMAGE_TAG=latest` (override recommended for real deployments)
+
 Ports:
 - API: `http://127.0.0.1:8000`
 - UI: `http://127.0.0.1:8501`

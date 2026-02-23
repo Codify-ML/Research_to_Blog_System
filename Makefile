@@ -9,6 +9,17 @@
 	test-e2e \
 	test-gate \
 	test-perf \
+	ecr-login-dev \
+	image-build-dev \
+	image-push-dev \
+	deploy-plan-dev \
+	deploy-dev \
+	tf-fmt \
+	tf-init-dev \
+	tf-validate-dev \
+	tf-plan-dev \
+	tf-apply-dev \
+	tf-destroy-dev \
 	docker-up \
 	docker-down \
 	docker-logs \
@@ -43,6 +54,18 @@ WORKER_CMD_PATTERN := celery -A apps.worker.app.celery_app:celery_app worker -l 
 UI_CMD_PATTERN := streamlit run apps/ui/app.py --server.address 127.0.0.1 --server.port $(UI_PORT) --browser.gatherUsageStats false --server.headless true
 DOCKER_COMPOSE_FILE := docker-compose.local.yml
 DOCKER_COMPOSE := docker compose -f $(DOCKER_COMPOSE_FILE)
+TF_DEV_DIR := infra/terraform/envs/dev
+AWS_PROFILE ?= personal-aws-dev
+AWS_REGION ?= us-west-2
+AWS_ACCOUNT_ID ?= 497458934978
+PROJECT_NAME ?= vc-blog-agent
+CLOUD_ENV ?= dev
+IMAGE_TAG ?= latest
+IMAGE_PLATFORM ?= linux/amd64
+ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+API_ECR_IMAGE := $(ECR_REGISTRY)/$(PROJECT_NAME)-$(CLOUD_ENV)-api:$(IMAGE_TAG)
+WORKER_ECR_IMAGE := $(ECR_REGISTRY)/$(PROJECT_NAME)-$(CLOUD_ENV)-worker:$(IMAGE_TAG)
+UI_ECR_IMAGE := $(ECR_REGISTRY)/$(PROJECT_NAME)-$(CLOUD_ENV)-ui:$(IMAGE_TAG)
 
 help:
 	@echo "Available targets:"
@@ -55,6 +78,18 @@ help:
 	@echo "  test-e2e  Run UI lifecycle e2e tests"
 	@echo "  test-gate Run API readiness gate suite (Phase 4.5)"
 	@echo "  test-perf Run API enqueue latency benchmark test"
+	@echo "  ecr-login-dev Authenticate Docker to dev ECR registry"
+	@echo "  image-build-dev Build API/worker/UI images for dev"
+	@echo "  image-push-dev Build and push API/worker/UI images to ECR"
+	@echo "  deploy-plan-dev Terraform plan for dev using IMAGE_TAG"
+	@echo "  deploy-dev Build/push images and apply Terraform with IMAGE_TAG"
+	@echo "              Optional IMAGE_PLATFORM (default linux/amd64)"
+	@echo "  tf-fmt    Format Terraform files"
+	@echo "  tf-init-dev Init Terraform in infra/terraform/envs/dev"
+	@echo "  tf-validate-dev Validate Terraform config for dev"
+	@echo "  tf-plan-dev Plan Terraform changes for dev"
+	@echo "  tf-apply-dev Apply Terraform changes for dev"
+	@echo "  tf-destroy-dev Destroy Terraform resources for dev"
 	@echo "  docker-up Start local Docker stack (Phase 4)"
 	@echo "  docker-down Stop local Docker stack"
 	@echo "  docker-logs Tail local Docker stack logs"
@@ -104,6 +139,53 @@ test-gate:
 
 test-perf:
 	uv run pytest tests/performance/test_generate_enqueue_latency.py
+
+ecr-login-dev:
+	@AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
+		aws ecr get-login-password | docker login \
+		--username AWS --password-stdin $(ECR_REGISTRY)
+
+image-build-dev:
+	docker build --platform $(IMAGE_PLATFORM) \
+		-f docker/api.Dockerfile -t $(API_ECR_IMAGE) .
+	docker build --platform $(IMAGE_PLATFORM) \
+		-f docker/worker.Dockerfile -t $(WORKER_ECR_IMAGE) .
+	docker build --platform $(IMAGE_PLATFORM) \
+		-f docker/ui.Dockerfile -t $(UI_ECR_IMAGE) .
+
+image-push-dev: ecr-login-dev image-build-dev
+	docker push $(API_ECR_IMAGE)
+	docker push $(WORKER_ECR_IMAGE)
+	docker push $(UI_ECR_IMAGE)
+
+deploy-plan-dev:
+	terraform -chdir=$(TF_DEV_DIR) plan \
+		-var-file=terraform.tfvars \
+		-var="image_tag=$(IMAGE_TAG)"
+
+deploy-dev: image-push-dev
+	terraform -chdir=$(TF_DEV_DIR) apply \
+		-var-file=terraform.tfvars \
+		-var="image_tag=$(IMAGE_TAG)" \
+		-auto-approve
+
+tf-fmt:
+	terraform fmt -recursive infra/terraform
+
+tf-init-dev:
+	terraform -chdir=$(TF_DEV_DIR) init -reconfigure -backend-config=backend.hcl
+
+tf-validate-dev:
+	terraform -chdir=$(TF_DEV_DIR) validate
+
+tf-plan-dev:
+	terraform -chdir=$(TF_DEV_DIR) plan -var-file=terraform.tfvars
+
+tf-apply-dev:
+	terraform -chdir=$(TF_DEV_DIR) apply -var-file=terraform.tfvars
+
+tf-destroy-dev:
+	terraform -chdir=$(TF_DEV_DIR) destroy -var-file=terraform.tfvars
 
 docker-up:
 	$(DOCKER_COMPOSE) up --build -d
