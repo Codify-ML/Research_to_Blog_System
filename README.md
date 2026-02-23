@@ -95,3 +95,7 @@ Researcher tool controls:
 - `apps/ui/app.py`
 - `apps/ui/api_client.py`
 - `tests/unit/`
+
+## Architecture Reference
+- Architecture planning notes are maintained in the local
+  `initial_planning/` workspace during planning phases.
