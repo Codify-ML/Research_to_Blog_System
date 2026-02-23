@@ -87,6 +87,11 @@ services:
       UI_API_BASE_URL: http://api:8000
       UI_POLL_INTERVAL_SECONDS: "1.0"
       UI_REQUEST_TIMEOUT_SECONDS: "10.0"
+      API_AUTH_ENABLED: ${API_AUTH_ENABLED:-false}
+      API_AUTH_KEY: ${API_AUTH_KEY:-}
+      UI_COGNITO_HOSTED_UI_BASE: ${UI_COGNITO_HOSTED_UI_BASE:-}
+      UI_COGNITO_CLIENT_ID: ${UI_COGNITO_CLIENT_ID:-}
+      UI_PUBLIC_BASE_URL: ${UI_PUBLIC_BASE_URL:-http://127.0.0.1:8501}
     depends_on:
       api:
         condition: service_healthy

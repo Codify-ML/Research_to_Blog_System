@@ -61,10 +61,14 @@ class ApiClient:
         *,
         base_url: str,
         timeout_seconds: float,
+        api_auth_enabled: bool = False,
+        api_auth_key: str | None = None,
         session: requests.Session | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
+        self.api_auth_enabled = api_auth_enabled
+        self.api_auth_key = api_auth_key
         self.session = session or requests.Session()
 
     def generate(
@@ -134,10 +138,14 @@ class ApiClient:
     ) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
         try:
+            headers: dict[str, str] = {}
+            if self.api_auth_enabled and self.api_auth_key:
+                headers["X-API-Key"] = self.api_auth_key
             response = self.session.request(
                 method=method,
                 url=url,
                 json=json,
+                headers=headers or None,
                 timeout=self.timeout_seconds,
             )
         except requests.RequestException as exc:

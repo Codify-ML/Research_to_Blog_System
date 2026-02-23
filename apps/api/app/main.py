@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from hmac import compare_digest
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -19,6 +20,27 @@ from packages.core.errors import JobNotFoundError, QueueUnavailableError
 from packages.core.job_store import get_job_store
 from packages.core.settings import get_settings
 from packages.graph.workflow import initial_state
+
+
+def _enforce_api_auth(
+    *,
+    provided_api_key: str | None,
+) -> None:
+    settings = get_settings()
+    if not settings.api_auth_enabled:
+        return
+
+    expected_key = settings.api_auth_key
+    if (
+        expected_key is None
+        or provided_api_key is None
+        or not compare_digest(provided_api_key, expected_key)
+    ):
+        detail = ApiErrorResponse(
+            code="UNAUTHORIZED",
+            message="Valid API key is required.",
+        ).model_dump()
+        raise HTTPException(status_code=401, detail=detail)
 
 
 def create_app() -> FastAPI:
@@ -73,7 +95,11 @@ def create_app() -> FastAPI:
         return {"status": "ready"}
 
     @app.post("/generate", response_model=GenerateResponse)
-    def generate(request: GenerateRequest) -> GenerateResponse:
+    def generate(
+        request: GenerateRequest,
+        x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    ) -> GenerateResponse:
+        _enforce_api_auth(provided_api_key=x_api_key)
         store = get_job_store()
         settings = get_settings()
 
@@ -135,7 +161,11 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/status/{job_id}", response_model=StatusResponse)
-    def status(job_id: str) -> StatusResponse:
+    def status(
+        job_id: str,
+        x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    ) -> StatusResponse:
+        _enforce_api_auth(provided_api_key=x_api_key)
         store = get_job_store()
 
         try:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from urllib.parse import quote
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -39,7 +40,38 @@ def _build_client() -> ApiClient:
     return ApiClient(
         base_url=settings.ui_api_base_url,
         timeout_seconds=settings.ui_request_timeout_seconds,
+        api_auth_enabled=settings.api_auth_enabled,
+        api_auth_key=settings.api_auth_key,
     )
+
+
+def _build_account_urls() -> tuple[str, str] | None:
+    settings = get_ui_settings()
+    if (
+        not settings.ui_cognito_hosted_ui_base
+        or not settings.ui_cognito_client_id
+    ):
+        return None
+
+    hosted_ui_base = settings.ui_cognito_hosted_ui_base.rstrip("/")
+    public_base = settings.ui_public_base_url.rstrip("/")
+    redirect_uri = quote(f"{public_base}/oauth2/idpresponse", safe="")
+    logout_uri = quote(f"{public_base}/", safe="")
+    client_id = quote(settings.ui_cognito_client_id, safe="")
+    sign_out_url = (
+        f"{hosted_ui_base}/logout"
+        f"?client_id={client_id}"
+        f"&logout_uri={logout_uri}"
+    )
+    switch_account_url = (
+        f"{hosted_ui_base}/oauth2/authorize"
+        f"?client_id={client_id}"
+        "&response_type=code"
+        "&scope=openid+email+profile"
+        f"&redirect_uri={redirect_uri}"
+        "&prompt=login"
+    )
+    return sign_out_url, switch_account_url
 
 
 def _init_session_state() -> None:
@@ -148,7 +180,24 @@ def main() -> None:
     client = _build_client()
 
     st.set_page_config(page_title="Research to Blog UI", layout="wide")
-    st.title("Research to Blog - Phase 3 UI")
+    header_col, switch_col, signout_col = st.columns([6, 1.2, 1.2])
+    with header_col:
+        st.title("Research to Blog - Phase 3 UI")
+    account_urls = _build_account_urls()
+    if account_urls is not None:
+        sign_out_url, switch_account_url = account_urls
+        with switch_col:
+            st.link_button(
+                "Switch Account",
+                switch_account_url,
+                use_container_width=True,
+            )
+        with signout_col:
+            st.link_button(
+                "Sign Out",
+                sign_out_url,
+                use_container_width=True,
+            )
     st.caption(f"Connected API: `{settings.ui_api_base_url}`")
 
     _init_session_state()

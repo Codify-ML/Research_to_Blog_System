@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     openai_model_researcher: str = "gpt-4.1"
     openai_model_writer: str = "gpt-4.1-mini"
     openai_model_editor: str = "gpt-4.1-mini"
+    api_auth_enabled: bool = False
+    api_auth_key: str | None = None
     research_web_search_enabled: bool = True
     research_function_tools_enabled: bool = True
 
@@ -45,6 +47,10 @@ class Settings(BaseSettings):
         if self.mock_mode_strict and not self.use_mock_llm:
             raise ValueError(
                 "MOCK_MODE_STRICT cannot be true when USE_MOCK_LLM is false."
+            )
+        if self.api_auth_enabled and not self.api_auth_key:
+            raise ValueError(
+                "API_AUTH_KEY is required when API_AUTH_ENABLED is true."
             )
         return self
 
