@@ -1,6 +1,7 @@
 # Research to Blog System
 
-Phase 1 and Phase 2 scaffold for a multi-agent content pipeline.
+Phase 1, Phase 2, and Phase 3 scaffold for a multi-agent content
+pipeline.
 
 ## Phase 1 Scope
 - LangGraph core workflow (Researcher -> Writer -> Editor -> Escalation)
@@ -14,6 +15,12 @@ Phase 1 and Phase 2 scaffold for a multi-agent content pipeline.
 - Celery worker task integration
 - SQLite-backed local job store for status lifecycle
 - Integration tests for API contracts, lifecycle, retries, and errors
+
+## Phase 3 Scope
+- Streamlit UI for topic submission and status polling
+- Status panel with lifecycle, notes, feedback, and current draft
+- Terminal-state handling for `COMPLETED`, `FAILED`, and `ESCALATED`
+- Unit tests for UI API client and status helpers
 
 ## Prerequisites
 - Python 3.11+
@@ -33,9 +40,19 @@ make run-api
 make run-worker
 ```
 
+### Phase 3 local UI
+```bash
+make run-ui
+```
+
+Ports:
+- API: `http://127.0.0.1:8000`
+- UI: `http://127.0.0.1:8501`
+
 ### Background service control
 ```bash
 make run-services-bg
+make run-ui-bg
 make stop-services
 ```
 
@@ -56,4 +73,6 @@ Optional strict safety flag:
 - `packages/graph/router.py`
 - `packages/graph/workflow.py`
 - `apps/run_phase1_sync.py`
+- `apps/ui/app.py`
+- `apps/ui/api_client.py`
 - `tests/unit/`

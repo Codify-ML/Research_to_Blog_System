@@ -28,6 +28,7 @@ class StatusResponse(BaseModel):
     status: AgentStatus
     revision_count: int
     draft: str
+    research_notes: list[str]
     editor_feedback: list[str]
     error_message: str | None
     created_at: str

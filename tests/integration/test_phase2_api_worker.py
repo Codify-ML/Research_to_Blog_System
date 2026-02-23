@@ -65,6 +65,8 @@ def test_happy_path_lifecycle_and_idempotent_polling(client, monkeypatch):
 
     payload = first.json()
     assert payload["status"] == "COMPLETED"
+    assert isinstance(payload["research_notes"], list)
+    assert payload["research_notes"]
 
     transitions = payload["status_transitions"]
     transition_targets = [t["to"] for t in transitions]
