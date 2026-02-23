@@ -10,6 +10,7 @@ from packages.core.settings import get_settings
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("JOB_STORE_PATH", str(tmp_path / "jobs.db"))
+    monkeypatch.setenv("JOB_STORE_BACKEND", "sqlite")
     monkeypatch.setenv("USE_MOCK_LLM", "true")
     monkeypatch.setenv("MOCK_MODE_STRICT", "true")
     monkeypatch.setenv("LLM_MAX_RETRIES", "2")

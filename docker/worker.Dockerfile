@@ -1,0 +1,24 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV UV_LINK_MODE=copy
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock README.md /app/
+RUN uv sync --frozen --no-dev
+
+COPY apps /app/apps
+COPY packages /app/packages
+COPY scripts /app/scripts
+
+ENV PATH="/app/.venv/bin:${PATH}"
+
+CMD ["uv", "run", "celery", "-A", "apps.worker.app.celery_app:celery_app", "worker", "-l", "info"]

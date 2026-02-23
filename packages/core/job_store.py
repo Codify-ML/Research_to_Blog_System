@@ -5,7 +5,9 @@ import sqlite3
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
+
+import psycopg
 
 from packages.core.constants import AgentStatus
 from packages.core.errors import JobNotFoundError
@@ -49,27 +51,30 @@ def _status_value(status: AgentStatus | str) -> str:
     return status
 
 
-class SQLiteJobStore:
-    def __init__(self, db_path: str) -> None:
-        self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_db()
+class JobStore(Protocol):
+    def create_job(self, initial_state: dict[str, Any]) -> dict[str, Any]: ...
 
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+    def get_job(self, job_id: str) -> dict[str, Any] | None: ...
 
-    def _init_db(self) -> None:
-        with self._connect() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS jobs (
-                    job_id TEXT PRIMARY KEY,
-                    payload TEXT NOT NULL
-                )
-                """)
-            conn.commit()
+    def get_job_or_raise(self, job_id: str) -> dict[str, Any]: ...
 
+    def set_status(
+        self,
+        *,
+        job_id: str,
+        next_status: AgentStatus | str,
+        error_message: str | None = None,
+    ) -> dict[str, Any]: ...
+
+    def update_job(
+        self,
+        *,
+        job_id: str,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]: ...
+
+
+class BaseJobStore:
     def create_job(self, initial_state: dict[str, Any]) -> dict[str, Any]:
         now = _utc_now()
         status = _status_value(initial_state["status"])
@@ -88,25 +93,11 @@ class SQLiteJobStore:
             ],
         }
 
-        payload = json.dumps(record)
-        with self._connect() as conn:
-            conn.execute(
-                "INSERT INTO jobs(job_id, payload) VALUES (?, ?)",
-                (record["job_id"], payload),
-            )
-            conn.commit()
+        self._insert_record(record)
         return record
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT payload FROM jobs WHERE job_id = ?",
-                (job_id,),
-            ).fetchone()
-
-        if row is None:
-            return None
-        return json.loads(row["payload"])
+        raise NotImplementedError
 
     def get_job_or_raise(self, job_id: str) -> dict[str, Any]:
         record = self.get_job(job_id)
@@ -160,14 +151,11 @@ class SQLiteJobStore:
         self._persist(record)
         return record
 
+    def _insert_record(self, record: dict[str, Any]) -> None:
+        raise NotImplementedError
+
     def _persist(self, record: dict[str, Any]) -> None:
-        payload = json.dumps(record)
-        with self._connect() as conn:
-            conn.execute(
-                "UPDATE jobs SET payload = ? WHERE job_id = ?",
-                (payload, record["job_id"]),
-            )
-            conn.commit()
+        raise NotImplementedError
 
     def _validate_transition(self, current: str, nxt: str) -> None:
         if current in TERMINAL_STATUSES:
@@ -179,7 +167,122 @@ class SQLiteJobStore:
             raise ValueError(f"Invalid status transition: {current} -> {nxt}.")
 
 
+class SQLiteJobStore(BaseJobStore):
+    def __init__(self, db_path: str) -> None:
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def _init_db(self) -> None:
+        with self._connect() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS jobs (
+                    job_id TEXT PRIMARY KEY,
+                    payload TEXT NOT NULL
+                )
+                """)
+            conn.commit()
+
+    def _insert_record(self, record: dict[str, Any]) -> None:
+        payload = json.dumps(record)
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO jobs(job_id, payload) VALUES (?, ?)",
+                (record["job_id"], payload),
+            )
+            conn.commit()
+
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT payload FROM jobs WHERE job_id = ?",
+                (job_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+        return json.loads(row["payload"])
+
+    def _persist(self, record: dict[str, Any]) -> None:
+        payload = json.dumps(record)
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE jobs SET payload = ? WHERE job_id = ?",
+                (payload, record["job_id"]),
+            )
+            conn.commit()
+
+
+class PostgresJobStore(BaseJobStore):
+    def __init__(self, dsn: str) -> None:
+        self.dsn = dsn
+        self._init_db()
+
+    def _connect(self):
+        return psycopg.connect(self.dsn)
+
+    def _init_db(self) -> None:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS jobs (
+                        job_id TEXT PRIMARY KEY,
+                        payload JSONB NOT NULL
+                    )
+                    """)
+            conn.commit()
+
+    def _insert_record(self, record: dict[str, Any]) -> None:
+        payload = json.dumps(record)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    (
+                        "INSERT INTO jobs(job_id, payload) "
+                        "VALUES (%s, %s::jsonb)"
+                    ),
+                    (record["job_id"], payload),
+                )
+            conn.commit()
+
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    (
+                        "SELECT payload::text AS payload "
+                        "FROM jobs WHERE job_id = %s"
+                    ),
+                    (job_id,),
+                )
+                row = cur.fetchone()
+
+        if row is None:
+            return None
+        return json.loads(row[0])
+
+    def _persist(self, record: dict[str, Any]) -> None:
+        payload = json.dumps(record)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    (
+                        "UPDATE jobs SET payload = %s::jsonb "
+                        "WHERE job_id = %s"
+                    ),
+                    (payload, record["job_id"]),
+                )
+            conn.commit()
+
+
 @lru_cache(maxsize=1)
-def get_job_store() -> SQLiteJobStore:
+def get_job_store() -> JobStore:
     settings = get_settings()
+    if settings.job_store_backend == "postgres":
+        return PostgresJobStore(settings.database_url)
     return SQLiteJobStore(settings.job_store_path)

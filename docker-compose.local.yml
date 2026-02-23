@@ -1,0 +1,109 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    command: ["redis-server", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - app_net
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: research_blog
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d research_blog"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - app_net
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    environment:
+      USE_MOCK_LLM: "true"
+      MOCK_MODE_STRICT: "false"
+      JOB_STORE_BACKEND: postgres
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/research_blog
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - app_net
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    environment:
+      USE_MOCK_LLM: "true"
+      MOCK_MODE_STRICT: "false"
+      JOB_STORE_BACKEND: postgres
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/research_blog
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app_net
+
+  ui:
+    build:
+      context: .
+      dockerfile: docker/ui.Dockerfile
+    environment:
+      UI_API_BASE_URL: http://api:8000
+      UI_POLL_INTERVAL_SECONDS: "1.0"
+      UI_REQUEST_TIMEOUT_SECONDS: "10.0"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:8501/_stcore/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+    networks:
+      - app_net
+
+volumes:
+  pg_data:
+
+networks:
+  app_net:
+    driver: bridge

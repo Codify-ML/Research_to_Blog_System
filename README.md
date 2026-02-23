@@ -46,6 +46,26 @@ make run-worker
 make run-ui
 ```
 
+### Phase 4 local Docker stack
+```bash
+make docker-up
+make docker-ps
+make docker-smoke
+make docker-smoke-db
+make test-gate
+make docker-down
+```
+`make docker-smoke` executes inside the API container to validate
+enqueue/poll lifecycle using the compose network directly.
+`make docker-smoke-db` extends this with a direct `psql` check
+against Postgres to confirm the corresponding `jobs` row was persisted
+with terminal status and transition history.
+`make test-gate` runs the Phase 4.5 pre-cloud API readiness suite
+(strict API contracts, lifecycle/idempotency checks, reliability checks,
+and enqueue latency benchmark with `p95 < 500ms`).
+The compose stack uses a Postgres-backed job store (`JOB_STORE_BACKEND=postgres`)
+for API/worker parity.
+
 Ports:
 - API: `http://127.0.0.1:8000`
 - UI: `http://127.0.0.1:8501`

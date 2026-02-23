@@ -27,12 +27,13 @@ def test_generate_returns_pending_and_job_id(client, monkeypatch):
 def test_generate_invalid_payload_returns_422(client):
     response = client.post("/generate", json={"topic": ""})
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()["code"] == "VALIDATION_ERROR"
 
 
 def test_status_unknown_job_returns_404(client):
     response = client.get("/status/does-not-exist")
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json()["detail"]["code"] == "JOB_NOT_FOUND"
+    assert response.json()["code"] == "JOB_NOT_FOUND"
 
 
 def test_queue_unavailable_returns_503(client, monkeypatch):
@@ -47,7 +48,7 @@ def test_queue_unavailable_returns_503(client, monkeypatch):
     response = client.post("/generate", json={"topic": "queue test"})
 
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    assert response.json()["detail"]["code"] == "QUEUE_UNAVAILABLE"
+    assert response.json()["code"] == "QUEUE_UNAVAILABLE"
 
 
 def test_generate_openai_mode_rejected_when_mock_mode_strict(client):
@@ -56,7 +57,7 @@ def test_generate_openai_mode_rejected_when_mock_mode_strict(client):
         json={"topic": "openai mode", "llm_mode": "openai"},
     )
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    assert response.json()["detail"]["code"] == "MOCK_MODE_STRICT"
+    assert response.json()["code"] == "MOCK_MODE_STRICT"
 
 
 def test_happy_path_lifecycle_and_idempotent_polling(client, monkeypatch):

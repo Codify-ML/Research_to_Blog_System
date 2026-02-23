@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     )
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
+    job_store_backend: Literal["sqlite", "postgres"] = "sqlite"
     job_store_path: str = "./var/jobs.db"
 
     llm_max_retries: int = 3

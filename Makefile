@@ -7,6 +7,14 @@
 	test-unit \
 	test-integration \
 	test-e2e \
+	test-gate \
+	test-perf \
+	docker-up \
+	docker-down \
+	docker-logs \
+	docker-ps \
+	docker-smoke \
+	docker-smoke-db \
 	run-sync \
 	run-api \
 	run-worker \
@@ -32,6 +40,8 @@ UI_PID_FILE := $(RUN_DIR)/ui.pid
 API_CMD_PATTERN := uvicorn apps.api.app.main:app --host 127.0.0.1 --port $(API_PORT)
 WORKER_CMD_PATTERN := celery -A apps.worker.app.celery_app:celery_app worker -l info
 UI_CMD_PATTERN := streamlit run apps/ui/app.py --server.address 127.0.0.1 --server.port $(UI_PORT) --browser.gatherUsageStats false --server.headless true
+DOCKER_COMPOSE_FILE := docker-compose.local.yml
+DOCKER_COMPOSE := docker compose -f $(DOCKER_COMPOSE_FILE)
 
 help:
 	@echo "Available targets:"
@@ -42,6 +52,14 @@ help:
 	@echo "  test-unit Alias for test"
 	@echo "  test-integration Run integration tests"
 	@echo "  test-e2e  Run UI lifecycle e2e tests"
+	@echo "  test-gate Run API readiness gate suite (Phase 4.5)"
+	@echo "  test-perf Run API enqueue latency benchmark test"
+	@echo "  docker-up Start local Docker stack (Phase 4)"
+	@echo "  docker-down Stop local Docker stack"
+	@echo "  docker-logs Tail local Docker stack logs"
+	@echo "  docker-ps List local Docker stack service status"
+	@echo "  docker-smoke Run API lifecycle smoke against Docker stack"
+	@echo "  docker-smoke-db Run smoke + direct Postgres persistence check"
 	@echo "  run-sync  Run the synchronous Phase 1 graph harness"
 	@echo "  run-api   Run FastAPI server in foreground (Phase 2)"
 	@echo "  run-worker Run Celery worker in foreground (Phase 2)"
@@ -75,6 +93,48 @@ test-integration:
 
 test-e2e:
 	uv run pytest tests/e2e
+
+test-gate:
+	uv run pytest \
+		tests/integration/test_phase2_api_worker.py \
+		tests/integration/test_api_readiness_gate.py \
+		tests/performance/test_generate_enqueue_latency.py
+
+test-perf:
+	uv run pytest tests/performance/test_generate_enqueue_latency.py
+
+docker-up:
+	$(DOCKER_COMPOSE) up --build -d
+
+docker-down:
+	$(DOCKER_COMPOSE) down --remove-orphans
+
+docker-logs:
+	$(DOCKER_COMPOSE) logs -f --tail=200
+
+docker-ps:
+	$(DOCKER_COMPOSE) ps
+
+docker-smoke:
+	@$(DOCKER_COMPOSE) exec -T api /bin/sh -lc '\
+		resp=$$(curl -sS -X POST http://127.0.0.1:8000/generate \
+			-H "content-type: application/json" \
+			-d "{\"topic\":\"Docker Phase 4 smoke run\",\"llm_mode\":\"mock\"}"); \
+		echo "$$resp"; \
+		job_id=$$(python -c "import json,sys; print(json.loads(sys.argv[1])[\"job_id\"])" "$$resp"); \
+		for i in $$(seq 1 60); do \
+			out=$$(curl -sS "http://127.0.0.1:8000/status/$$job_id"); \
+			st=$$(python -c "import json,sys; print(json.loads(sys.argv[1])[\"status\"])" "$$out"); \
+			echo "$$st"; \
+			if [ "$$st" = "COMPLETED" ] || [ "$$st" = "FAILED" ] || [ "$$st" = "ESCALATED" ]; then \
+				echo "$$out"; \
+				break; \
+			fi; \
+			sleep 1; \
+		done'
+
+docker-smoke-db:
+	@bash scripts/docker_smoke_db_check.sh $(DOCKER_COMPOSE_FILE)
 
 run-sync:
 	@mkdir -p $(RUN_DIR)
