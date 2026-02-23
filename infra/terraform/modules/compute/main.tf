@@ -12,9 +12,14 @@ locals {
     name      = "OPENAI_API_KEY"
     valueFrom = var.openai_secret_arn
   }] : []
+  api_auth_secret = var.api_auth_secret_arn != "" ? [{
+    name      = "API_AUTH_KEY"
+    valueFrom = var.api_auth_secret_arn
+  }] : []
   api_environment = [
     { name = "USE_MOCK_LLM", value = tostring(var.use_mock_llm) },
     { name = "MOCK_MODE_STRICT", value = tostring(var.mock_mode_strict) },
+    { name = "API_AUTH_ENABLED", value = tostring(var.api_auth_enabled) },
     {
       name  = "OPENAI_MODEL_RESEARCHER"
       value = var.openai_model_researcher
@@ -35,6 +40,16 @@ locals {
     { name = "UI_API_BASE_URL", value = var.api_base_url },
     { name = "UI_POLL_INTERVAL_SECONDS", value = "1.0" },
     { name = "UI_REQUEST_TIMEOUT_SECONDS", value = "10.0" },
+    { name = "API_AUTH_ENABLED", value = tostring(var.api_auth_enabled) },
+    {
+      name  = "UI_COGNITO_HOSTED_UI_BASE"
+      value = var.ui_cognito_hosted_ui_base
+    },
+    {
+      name  = "UI_COGNITO_CLIENT_ID"
+      value = var.ui_cognito_user_pool_client_id
+    },
+    { name = "UI_PUBLIC_BASE_URL", value = var.ui_public_base_url },
   ]
 }
 
@@ -224,7 +239,7 @@ resource "aws_ecs_task_definition" "api" {
         protocol      = "tcp"
       }]
       environment = local.api_environment
-      secrets     = local.openai_secret
+      secrets     = concat(local.openai_secret, local.api_auth_secret)
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -252,7 +267,7 @@ resource "aws_ecs_task_definition" "worker" {
       image       = var.worker_image
       essential   = true
       environment = local.worker_environment
-      secrets     = local.openai_secret
+      secrets     = concat(local.openai_secret, local.api_auth_secret)
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -285,6 +300,7 @@ resource "aws_ecs_task_definition" "ui" {
         protocol      = "tcp"
       }]
       environment = local.ui_environment
+      secrets     = local.api_auth_secret
       logConfiguration = {
         logDriver = "awslogs"
         options = {

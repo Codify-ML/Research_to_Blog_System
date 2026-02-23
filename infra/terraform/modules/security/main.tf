@@ -9,6 +9,13 @@ data "aws_iam_policy_document" "ecs_task_assume_role" {
   }
 }
 
+locals {
+  task_secret_arns = compact([
+    var.openai_secret_arn,
+    var.api_auth_secret_arn,
+  ])
+}
+
 resource "aws_security_group" "alb_api" {
   name        = "${var.name_prefix}-alb-api-sg"
   description = "ALB security group for API ingress"
@@ -183,7 +190,7 @@ resource "aws_iam_role_policy" "task_openai_secret" {
         Action = [
           "secretsmanager:GetSecretValue",
         ]
-        Resource = [var.openai_secret_arn]
+        Resource = local.task_secret_arns
       },
     ]
   })
@@ -201,7 +208,7 @@ resource "aws_iam_role_policy" "task_execution_openai_secret" {
         Action = [
           "secretsmanager:GetSecretValue",
         ]
-        Resource = [var.openai_secret_arn]
+        Resource = local.task_secret_arns
       },
     ]
   })

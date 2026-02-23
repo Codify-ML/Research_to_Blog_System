@@ -44,6 +44,8 @@ No `apply` is run automatically. Review the plan first.
   records for API/UI hostnames.
 - UI ALB uses Cognito hosted login (`authenticate-cognito`) for access
   control at the edge.
+- API shared-key auth can be enabled with `api_auth_enabled=true`.
+  The API key is stored in Secrets Manager and injected into API/UI tasks.
 - A regional WAF is associated with both ALBs (managed rules + rate limit).
 - If `api_image`, `worker_image`, and `ui_image` are empty, Terraform
   composes image URIs from created ECR repositories and `image_tag`.

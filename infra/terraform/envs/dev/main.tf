@@ -23,6 +23,7 @@ module "secrets" {
 
   name_prefix    = local.secret_prefix
   openai_api_key = var.openai_api_key
+  api_auth_key   = var.api_auth_key
 }
 
 module "ecr" {
@@ -100,9 +101,10 @@ resource "aws_cognito_user_pool_domain" "ui" {
 module "security" {
   source = "../../modules/security"
 
-  name_prefix       = local.name_prefix
-  vpc_id            = module.network.vpc_id
-  openai_secret_arn = module.secrets.openai_secret_arn
+  name_prefix         = local.name_prefix
+  vpc_id              = module.network.vpc_id
+  openai_secret_arn   = module.secrets.openai_secret_arn
+  api_auth_secret_arn = module.secrets.api_auth_secret_arn
 }
 
 module "data" {
@@ -142,15 +144,19 @@ module "compute" {
   redis_endpoint                 = module.data.redis_endpoint
   redis_port                     = module.data.redis_port
   openai_secret_arn              = module.secrets.openai_secret_arn
+  api_auth_secret_arn            = module.secrets.api_auth_secret_arn
   api_image                      = var.api_image != "" ? var.api_image : "${module.ecr.api_repository_url}:${var.image_tag}"
   worker_image                   = var.worker_image != "" ? var.worker_image : "${module.ecr.worker_repository_url}:${var.image_tag}"
   ui_image                       = var.ui_image != "" ? var.ui_image : "${module.ecr.ui_repository_url}:${var.image_tag}"
   api_base_url                   = var.enable_https ? "https://${var.api_hostname}" : "http://${var.api_hostname}"
+  api_auth_enabled               = var.api_auth_enabled
   use_mock_llm                   = var.use_mock_llm
   mock_mode_strict               = var.mock_mode_strict
   openai_model_researcher        = var.openai_model_researcher
   openai_model_writer            = var.openai_model_writer
   openai_model_editor            = var.openai_model_editor
+  ui_cognito_hosted_ui_base      = "https://${aws_cognito_user_pool_domain.ui.domain}.auth.${var.aws_region}.amazoncognito.com"
+  ui_public_base_url             = var.enable_https ? "https://${var.ui_hostname}" : "http://${var.ui_hostname}"
   enable_https                   = var.enable_https
   certificate_arn                = aws_acm_certificate_validation.app.certificate_arn
   enable_ui_auth                 = var.enable_ui_auth

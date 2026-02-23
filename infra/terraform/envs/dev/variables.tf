@@ -125,10 +125,30 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
+variable "api_auth_key" {
+  description = "Optional initial API shared key to write to Secrets Manager."
+  type        = string
+  default     = ""
+  sensitive   = true
+
+  validation {
+    condition = !(
+      var.api_auth_enabled && trimspace(var.api_auth_key) == ""
+    )
+    error_message = "api_auth_key must be provided when api_auth_enabled is true."
+  }
+}
+
 variable "waf_rate_limit" {
   description = "Per-5-minute request limit per IP for WAF rate rule."
   type        = number
   default     = 2000
+}
+
+variable "api_auth_enabled" {
+  description = "Enable API shared-key auth at application layer."
+  type        = bool
+  default     = true
 }
 
 variable "api_image" {

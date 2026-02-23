@@ -9,6 +9,8 @@ how to manage access for demo users.
 - The UI ALB HTTPS listener enforces `authenticate-cognito`.
 - Unauthenticated users are redirected to Cognito Hosted UI login.
 - After login, ALB forwards requests to the Streamlit UI service.
+- API requests are protected with app-layer shared-key auth
+  (`X-API-Key`) when `API_AUTH_ENABLED=true`.
 
 ## Who Can Authenticate
 
@@ -87,9 +89,18 @@ aws cognito-idp admin-delete-user \
 
 1. Apply Terraform.
 2. Create one or more Cognito users (admin action).
-3. Open `https://ui.vc-blog-agent.dev.vc-projects-ds.com`.
-4. User logs in via Cognito Hosted UI.
-5. User reaches Streamlit UI only after successful auth.
+3. Set API shared key in Secrets Manager (if API auth is enabled).
+4. Open `https://ui.vc-blog-agent.dev.vc-projects-ds.com`.
+5. User logs in via Cognito Hosted UI.
+6. User reaches Streamlit UI only after successful auth.
+
+## Sign Out and Switch Account
+
+The UI provides account controls:
+
+- `Sign Out`: sends the user through Cognito `/logout` and back to UI.
+- `Switch Account`: forces Cognito login prompt (`prompt=login`) so
+  a different user can authenticate.
 
 ## Security Notes
 

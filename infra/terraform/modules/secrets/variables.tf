@@ -9,3 +9,10 @@ variable "openai_api_key" {
   default     = ""
   sensitive   = true
 }
+
+variable "api_auth_key" {
+  description = "Optional initial API shared key secret value."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

@@ -95,6 +95,12 @@ variable "openai_secret_arn" {
   default     = ""
 }
 
+variable "api_auth_secret_arn" {
+  description = "Optional API auth key secret ARN for ECS secrets injection."
+  type        = string
+  default     = ""
+}
+
 variable "api_image" {
   description = "Container image for API service."
   type        = string
@@ -113,6 +119,24 @@ variable "ui_image" {
 variable "api_base_url" {
   description = "Base URL used by UI to reach API."
   type        = string
+}
+
+variable "api_auth_enabled" {
+  description = "Enable API shared-key auth checks."
+  type        = bool
+  default     = false
+}
+
+variable "ui_cognito_hosted_ui_base" {
+  description = "Base URL for Cognito hosted UI auth endpoints."
+  type        = string
+  default     = ""
+}
+
+variable "ui_public_base_url" {
+  description = "Public base URL for the UI service."
+  type        = string
+  default     = ""
 }
 
 variable "use_mock_llm" {
