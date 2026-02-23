@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     openai_model_researcher: str = "gpt-4.1"
     openai_model_writer: str = "gpt-4.1-mini"
     openai_model_editor: str = "gpt-4.1-mini"
+    research_web_search_enabled: bool = True
+    research_function_tools_enabled: bool = True
 
     redis_url: str = "redis://localhost:6379/0"
     database_url: str = (

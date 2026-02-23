@@ -5,9 +5,16 @@ from packages.graph.schemas import EditorDecision
 
 
 def test_editor_decision_valid() -> None:
-    decision = EditorDecision(is_approved=True, feedback=[])
+    decision = EditorDecision(
+        is_approved=True,
+        feedback=[],
+        strengths=["Clear structure."],
+        weaknesses=["Could use one more example."],
+    )
     assert decision.is_approved is True
     assert decision.feedback == []
+    assert decision.strengths
+    assert decision.weaknesses
 
 
 def test_editor_decision_reject_requires_feedback() -> None:

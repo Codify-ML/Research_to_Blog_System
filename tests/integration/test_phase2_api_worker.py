@@ -12,11 +12,15 @@ def test_generate_returns_pending_and_job_id(client, monkeypatch):
         lambda _job_id: "task-1",
     )
 
-    response = client.post("/generate", json={"topic": "test topic"})
+    response = client.post(
+        "/generate",
+        json={"topic": "test topic", "research_depth": "deep"},
+    )
 
     assert response.status_code == status.HTTP_200_OK
     payload = response.json()
     assert payload["status"] == "PENDING"
+    assert payload["llm_mode"] == "mock"
     assert payload["job_id"]
 
 
@@ -46,6 +50,15 @@ def test_queue_unavailable_returns_503(client, monkeypatch):
     assert response.json()["detail"]["code"] == "QUEUE_UNAVAILABLE"
 
 
+def test_generate_openai_mode_rejected_when_mock_mode_strict(client):
+    response = client.post(
+        "/generate",
+        json={"topic": "openai mode", "llm_mode": "openai"},
+    )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()["detail"]["code"] == "MOCK_MODE_STRICT"
+
+
 def test_happy_path_lifecycle_and_idempotent_polling(client, monkeypatch):
     monkeypatch.setattr(
         "apps.api.app.main.enqueue_generate_job",
@@ -65,6 +78,9 @@ def test_happy_path_lifecycle_and_idempotent_polling(client, monkeypatch):
 
     payload = first.json()
     assert payload["status"] == "COMPLETED"
+    assert payload["llm_mode"] == "mock"
+    assert payload["research_depth"] == "standard"
+    assert isinstance(payload["research_tools_used"], list)
     assert isinstance(payload["research_notes"], list)
     assert payload["research_notes"]
 

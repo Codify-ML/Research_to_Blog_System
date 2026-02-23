@@ -13,9 +13,10 @@ from apps.api.app.schemas import (
     GenerateResponse,
     StatusResponse,
 )
-from packages.core.constants import AgentStatus
+from packages.core.constants import AgentStatus, LLMMode
 from packages.core.errors import JobNotFoundError, QueueUnavailableError
 from packages.core.job_store import get_job_store
+from packages.core.settings import get_settings
 from packages.graph.workflow import initial_state
 
 
@@ -44,8 +45,43 @@ def create_app() -> FastAPI:
     @app.post("/generate", response_model=GenerateResponse)
     def generate(request: GenerateRequest) -> GenerateResponse:
         store = get_job_store()
+        settings = get_settings()
 
-        state = initial_state(request.topic)
+        selected_mode = request.llm_mode
+        if selected_mode is None:
+            if settings.use_mock_llm:
+                selected_mode = LLMMode.MOCK
+            else:
+                selected_mode = LLMMode.OPENAI
+
+        if selected_mode == LLMMode.OPENAI and not settings.openai_api_key:
+            detail = ApiErrorResponse(
+                code="OPENAI_KEY_REQUIRED",
+                message=(
+                    "OPENAI_API_KEY must be configured to use "
+                    "llm_mode='openai'."
+                ),
+            ).model_dump()
+            raise HTTPException(status_code=422, detail=detail)
+        if selected_mode == LLMMode.OPENAI and settings.mock_mode_strict:
+            detail = ApiErrorResponse(
+                code="MOCK_MODE_STRICT",
+                message=(
+                    "OPENAI mode is disabled while MOCK_MODE_STRICT is true."
+                ),
+            ).model_dump()
+            raise HTTPException(status_code=422, detail=detail)
+
+        state = initial_state(
+            request.topic,
+            llm_mode=selected_mode,
+            max_sources=request.max_sources,
+            content_format=request.content_format,
+            content_context=request.content_context,
+            tone=request.tone,
+            length_preference=request.length_preference,
+            research_depth=request.research_depth,
+        )
         store.create_job(state)
 
         try:
@@ -65,6 +101,7 @@ def create_app() -> FastAPI:
         return GenerateResponse(
             job_id=state["job_id"],
             status=AgentStatus.PENDING,
+            llm_mode=selected_mode,
         )
 
     @app.get("/status/{job_id}", response_model=StatusResponse)

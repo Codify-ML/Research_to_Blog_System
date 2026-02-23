@@ -4,9 +4,9 @@ import re
 import time
 
 from apps.worker.app.celery_app import celery_app
-from packages.core.constants import AgentStatus
+from packages.core.constants import AgentStatus, LLMMode
 from packages.core.job_store import get_job_store
-from packages.core.settings import get_settings
+from packages.core.settings import Settings, get_settings
 from packages.graph.agent_factory import build_agent_functions
 from packages.graph.workflow import create_workflow
 
@@ -21,10 +21,20 @@ def generate_blog_task(job_id: str) -> dict[str, str]:
 
 def process_job(job_id: str) -> dict[str, str]:
     store = get_job_store()
-    settings = get_settings()
+    base_settings = get_settings()
 
     record = store.get_job_or_raise(job_id)
     store.set_status(job_id=job_id, next_status=AgentStatus.RUNNING)
+
+    try:
+        settings = _settings_for_job(base_settings, record)
+    except Exception as exc:
+        store.set_status(
+            job_id=job_id,
+            next_status=AgentStatus.FAILED,
+            error_message=_sanitize_error(str(exc)),
+        )
+        raise
 
     research_fn, writer_fn, editor_fn = build_agent_functions(settings)
     workflow = create_workflow(
@@ -89,6 +99,27 @@ def process_job(job_id: str) -> dict[str, str]:
         "job_id": job_id,
         "status": final_status.value,
     }
+
+
+def _settings_for_job(
+    base_settings: Settings,
+    record: dict[str, object],
+) -> Settings:
+    raw_mode = str(record.get("llm_mode", LLMMode.MOCK.value)).lower()
+    mode = LLMMode(raw_mode)
+
+    if mode == LLMMode.OPENAI and not base_settings.openai_api_key:
+        raise ValueError(
+            "OPENAI_API_KEY is required when llm_mode is 'openai'."
+        )
+    if mode == LLMMode.OPENAI and base_settings.mock_mode_strict:
+        raise ValueError(
+            "OPENAI mode is disabled while MOCK_MODE_STRICT is true."
+        )
+
+    return base_settings.model_copy(
+        update={"use_mock_llm": mode == LLMMode.MOCK}
+    )
 
 
 def _sanitize_error(message: str) -> str:

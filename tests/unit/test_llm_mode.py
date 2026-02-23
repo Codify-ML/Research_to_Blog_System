@@ -44,3 +44,14 @@ def test_mock_client_is_deterministic() -> None:
     client = MockLLMClient()
     response = client.complete(prompt="hello", model="gpt-4.1-mini")
     assert response.startswith("[MOCK:gpt-4.1-mini]")
+
+
+def test_web_search_tool_fallback_variant() -> None:
+    client = OpenAILLMClient(api_key="test-key")
+    tools = [
+        {"type": "web_search"},
+        {"type": "function", "name": "x", "parameters": {"type": "object"}},
+    ]
+    fallback = client._fallback_web_search_tools(tools)
+    assert fallback is not None
+    assert fallback[0]["type"] == "web_search_preview"

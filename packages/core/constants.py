@@ -8,3 +8,8 @@ class AgentStatus(StrEnum):
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     ESCALATED = "ESCALATED"
+
+
+class LLMMode(StrEnum):
+    MOCK = "mock"
+    OPENAI = "openai"

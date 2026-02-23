@@ -3,7 +3,7 @@ from uuid import uuid4
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
-from packages.core.constants import AgentStatus
+from packages.core.constants import AgentStatus, LLMMode
 from packages.graph.nodes import (
     EditorFn,
     ResearchFn,
@@ -48,13 +48,32 @@ def create_workflow(
     return graph.compile(checkpointer=checkpointer or MemorySaver())
 
 
-def initial_state(topic: str) -> AgentState:
+def initial_state(
+    topic: str,
+    llm_mode: LLMMode = LLMMode.MOCK,
+    max_sources: int = 6,
+    content_format: str = "Blog article",
+    content_context: str = "",
+    tone: str = "professional",
+    length_preference: str = "balanced",
+    research_depth: str = "standard",
+) -> AgentState:
     return {
         "job_id": str(uuid4()),
         "topic": topic,
+        "llm_mode": llm_mode,
+        "max_sources": max_sources,
+        "content_format": content_format,
+        "content_context": content_context,
+        "tone": tone,
+        "length_preference": length_preference,
+        "research_depth": research_depth,
+        "research_tools_used": [],
         "research_notes": [],
         "draft": "",
         "editor_feedback": [],
+        "editor_strengths": [],
+        "editor_weaknesses": [],
         "is_approved": False,
         "revision_count": 0,
         "status": AgentStatus.PENDING,
