@@ -102,6 +102,13 @@ resource "aws_security_group" "ui" {
     security_groups = [aws_security_group.alb_ui.id]
   }
 
+  ingress {
+    from_port       = 8600
+    to_port         = 8600
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_ui.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

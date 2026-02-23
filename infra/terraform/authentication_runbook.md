@@ -7,6 +7,8 @@ how to manage access for demo users.
 
 - UI traffic goes through the UI ALB.
 - The UI ALB HTTPS listener enforces `authenticate-cognito`.
+- Path `/auth/logout` is routed to a dedicated logout service and bypasses
+  `authenticate-cognito`.
 - Unauthenticated users are redirected to Cognito Hosted UI login.
 - After login, ALB forwards requests to the Streamlit UI service.
 - API requests are protected with app-layer shared-key auth
@@ -94,13 +96,12 @@ aws cognito-idp admin-delete-user \
 5. User logs in via Cognito Hosted UI.
 6. User reaches Streamlit UI only after successful auth.
 
-## Sign Out and Switch Account
+## Sign Out
 
 The UI provides account controls:
 
-- `Sign Out`: sends the user through Cognito `/logout` and back to UI.
-- `Switch Account`: forces Cognito login prompt (`prompt=login`) so
-  a different user can authenticate.
+- `Sign Out`: calls `/auth/logout`, expires ALB auth cookies server-side,
+  then redirects to Cognito `/logout` and back to UI.
 
 ## Security Notes
 

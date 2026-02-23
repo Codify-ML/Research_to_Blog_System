@@ -9,10 +9,10 @@ def test_account_urls_absent_when_cognito_not_configured(monkeypatch):
     monkeypatch.delenv("UI_COGNITO_CLIENT_ID", raising=False)
     get_ui_settings.cache_clear()
 
-    assert ui_app._build_account_urls() is None
+    assert ui_app._build_signout_url() is None
 
 
-def test_account_urls_are_constructed(monkeypatch):
+def test_signout_url_is_constructed(monkeypatch):
     monkeypatch.setenv(
         "UI_COGNITO_HOSTED_UI_BASE",
         "https://example.auth.us-west-2.amazoncognito.com",
@@ -24,11 +24,5 @@ def test_account_urls_are_constructed(monkeypatch):
     )
     get_ui_settings.cache_clear()
 
-    urls = ui_app._build_account_urls()
-    assert urls is not None
-    sign_out_url, switch_account_url = urls
-    assert "/logout?" in sign_out_url
-    assert "client_id=client-123" in sign_out_url
-    assert "logout_uri=https%3A%2F%2Fui.example.com%2F" in sign_out_url
-    assert "/oauth2/authorize?" in switch_account_url
-    assert "prompt=login" in switch_account_url
+    sign_out_url = ui_app._build_signout_url()
+    assert sign_out_url == "https://ui.example.com/auth/logout"

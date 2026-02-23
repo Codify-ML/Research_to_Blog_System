@@ -51,6 +51,17 @@ locals {
     },
     { name = "UI_PUBLIC_BASE_URL", value = var.ui_public_base_url },
   ]
+  ui_logout_environment = [
+    {
+      name  = "UI_COGNITO_HOSTED_UI_BASE"
+      value = var.ui_cognito_hosted_ui_base
+    },
+    {
+      name  = "UI_COGNITO_CLIENT_ID"
+      value = var.ui_cognito_user_pool_client_id
+    },
+    { name = "UI_PUBLIC_BASE_URL", value = var.ui_public_base_url },
+  ]
 }
 
 resource "aws_cloudwatch_log_group" "api" {
@@ -65,6 +76,11 @@ resource "aws_cloudwatch_log_group" "worker" {
 
 resource "aws_cloudwatch_log_group" "ui" {
   name              = "/ecs/${var.name_prefix}/ui"
+  retention_in_days = 14
+}
+
+resource "aws_cloudwatch_log_group" "ui_logout" {
+  name              = "/ecs/${var.name_prefix}/ui-logout"
   retention_in_days = 14
 }
 
@@ -113,6 +129,22 @@ resource "aws_lb_target_group" "ui" {
 
   health_check {
     path                = "/_stcore/health"
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    interval            = 30
+    timeout             = 5
+  }
+}
+
+resource "aws_lb_target_group" "ui_logout" {
+  name        = "${var.name_prefix}-ui-lo-tg"
+  port        = 8600
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = var.vpc_id
+
+  health_check {
+    path                = "/health"
     healthy_threshold   = 2
     unhealthy_threshold = 3
     interval            = 30
@@ -219,6 +251,42 @@ resource "aws_lb_listener" "ui_https" {
   }
 }
 
+resource "aws_lb_listener_rule" "ui_logout_https" {
+  count = var.enable_https ? 1 : 0
+
+  listener_arn = aws_lb_listener.ui_https[0].arn
+  priority     = 5
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ui_logout.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/auth/logout"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "ui_logout_http" {
+  count = var.enable_https ? 0 : 1
+
+  listener_arn = aws_lb_listener.ui_http.arn
+  priority     = 5
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.ui_logout.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/auth/logout"]
+    }
+  }
+}
+
 resource "aws_ecs_task_definition" "api" {
   family                   = "${var.name_prefix}-api"
   network_mode             = "awsvpc"
@@ -313,6 +381,48 @@ resource "aws_ecs_task_definition" "ui" {
   ])
 }
 
+resource "aws_ecs_task_definition" "ui_logout" {
+  family                   = "${var.name_prefix}-ui-logout"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = var.task_execution_role_arn
+  task_role_arn            = var.task_role_arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "ui-logout"
+      image     = var.ui_image
+      essential = true
+      command = [
+        "uv",
+        "run",
+        "uvicorn",
+        "apps.ui.logout_app:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8600",
+      ]
+      portMappings = [{
+        containerPort = 8600
+        hostPort      = 8600
+        protocol      = "tcp"
+      }]
+      environment = local.ui_logout_environment
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ui_logout.name
+          awslogs-region        = data.aws_region.current.name
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    }
+  ])
+}
+
 resource "aws_ecs_service" "api" {
   name            = "${var.name_prefix}-api"
   cluster         = aws_ecs_cluster.this.id
@@ -364,6 +474,26 @@ resource "aws_ecs_service" "ui" {
     target_group_arn = aws_lb_target_group.ui.arn
     container_name   = "ui"
     container_port   = 8501
+  }
+}
+
+resource "aws_ecs_service" "ui_logout" {
+  name            = "${var.name_prefix}-ui-logout"
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.ui_logout.arn
+  desired_count   = var.ui_logout_desired_count
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = var.private_subnet_ids
+    security_groups  = [var.ui_sg_id]
+    assign_public_ip = false
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.ui_logout.arn
+    container_name   = "ui-logout"
+    container_port   = 8600
   }
 }
 

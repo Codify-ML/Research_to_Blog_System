@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import time
-from urllib.parse import quote
+from html import escape
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -45,7 +45,7 @@ def _build_client() -> ApiClient:
     )
 
 
-def _build_account_urls() -> tuple[str, str] | None:
+def _build_signout_url() -> str | None:
     settings = get_ui_settings()
     if (
         not settings.ui_cognito_hosted_ui_base
@@ -53,25 +53,24 @@ def _build_account_urls() -> tuple[str, str] | None:
     ):
         return None
 
-    hosted_ui_base = settings.ui_cognito_hosted_ui_base.rstrip("/")
     public_base = settings.ui_public_base_url.rstrip("/")
-    redirect_uri = quote(f"{public_base}/oauth2/idpresponse", safe="")
-    logout_uri = quote(f"{public_base}/", safe="")
-    client_id = quote(settings.ui_cognito_client_id, safe="")
-    sign_out_url = (
-        f"{hosted_ui_base}/logout"
-        f"?client_id={client_id}"
-        f"&logout_uri={logout_uri}"
+    return f"{public_base}/auth/logout"
+
+
+def _render_navigation_button(*, label: str, url: str) -> None:
+    safe_label = escape(label)
+    safe_url = escape(url, quote=True)
+    st.markdown(
+        (
+            f'<a href="{safe_url}" target="_self" '
+            'style="text-decoration:none;">'
+            '<div style="padding:0.45rem 0.75rem;'
+            "border-radius:0.5rem;border:1px solid #d9d9d9;"
+            "background:#f8f8f8;cursor:pointer;text-align:center;"
+            f'font-weight:600;">{safe_label}</div></a>'
+        ),
+        unsafe_allow_html=True,
     )
-    switch_account_url = (
-        f"{hosted_ui_base}/oauth2/authorize"
-        f"?client_id={client_id}"
-        "&response_type=code"
-        "&scope=openid+email+profile"
-        f"&redirect_uri={redirect_uri}"
-        "&prompt=login"
-    )
-    return sign_out_url, switch_account_url
 
 
 def _init_session_state() -> None:
@@ -180,23 +179,15 @@ def main() -> None:
     client = _build_client()
 
     st.set_page_config(page_title="Research to Blog UI", layout="wide")
-    header_col, switch_col, signout_col = st.columns([6, 1.2, 1.2])
+    header_col, signout_col = st.columns([7.2, 1.2])
     with header_col:
         st.title("Research to Blog - Phase 3 UI")
-    account_urls = _build_account_urls()
-    if account_urls is not None:
-        sign_out_url, switch_account_url = account_urls
-        with switch_col:
-            st.link_button(
-                "Switch Account",
-                switch_account_url,
-                use_container_width=True,
-            )
+    sign_out_url = _build_signout_url()
+    if sign_out_url is not None:
         with signout_col:
-            st.link_button(
-                "Sign Out",
-                sign_out_url,
-                use_container_width=True,
+            _render_navigation_button(
+                label="Sign Out",
+                url=sign_out_url,
             )
     st.caption(f"Connected API: `{settings.ui_api_base_url}`")
 

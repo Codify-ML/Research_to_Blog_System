@@ -187,6 +187,12 @@ variable "ui_desired_count" {
   default     = 1
 }
 
+variable "ui_logout_desired_count" {
+  description = "Desired number of UI logout tasks."
+  type        = number
+  default     = 1
+}
+
 variable "enable_https" {
   description = "Enable HTTPS listeners and HTTP-to-HTTPS redirects."
   type        = bool
