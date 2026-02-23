@@ -32,9 +32,9 @@ services:
     build:
       context: .
       dockerfile: docker/api.Dockerfile
+    env_file:
+      - .env
     environment:
-      USE_MOCK_LLM: "true"
-      MOCK_MODE_STRICT: "false"
       JOB_STORE_BACKEND: postgres
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -60,9 +60,9 @@ services:
     build:
       context: .
       dockerfile: docker/worker.Dockerfile
+    env_file:
+      - .env
     environment:
-      USE_MOCK_LLM: "true"
-      MOCK_MODE_STRICT: "false"
       JOB_STORE_BACKEND: postgres
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0

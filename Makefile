@@ -15,6 +15,7 @@
 	docker-ps \
 	docker-smoke \
 	docker-smoke-db \
+	docker-smoke-openai \
 	run-sync \
 	run-api \
 	run-worker \
@@ -60,6 +61,7 @@ help:
 	@echo "  docker-ps List local Docker stack service status"
 	@echo "  docker-smoke Run API lifecycle smoke against Docker stack"
 	@echo "  docker-smoke-db Run smoke + direct Postgres persistence check"
+	@echo "  docker-smoke-openai Run OpenAI-backed API smoke in Docker"
 	@echo "  run-sync  Run the synchronous Phase 1 graph harness"
 	@echo "  run-api   Run FastAPI server in foreground (Phase 2)"
 	@echo "  run-worker Run Celery worker in foreground (Phase 2)"
@@ -135,6 +137,9 @@ docker-smoke:
 
 docker-smoke-db:
 	@bash scripts/docker_smoke_db_check.sh $(DOCKER_COMPOSE_FILE)
+
+docker-smoke-openai:
+	@bash scripts/docker_smoke_openai_check.sh $(DOCKER_COMPOSE_FILE)
 
 run-sync:
 	@mkdir -p $(RUN_DIR)

@@ -52,6 +52,7 @@ make docker-up
 make docker-ps
 make docker-smoke
 make docker-smoke-db
+make docker-smoke-openai
 make test-gate
 make docker-down
 ```
@@ -60,11 +61,16 @@ enqueue/poll lifecycle using the compose network directly.
 `make docker-smoke-db` extends this with a direct `psql` check
 against Postgres to confirm the corresponding `jobs` row was persisted
 with terminal status and transition history.
+`make docker-smoke-openai` verifies an end-to-end Docker run with
+`llm_mode=openai` (requires `OPENAI_API_KEY` in `.env` or compose
+`--env-file`).
 `make test-gate` runs the Phase 4.5 pre-cloud API readiness suite
 (strict API contracts, lifecycle/idempotency checks, reliability checks,
 and enqueue latency benchmark with `p95 < 500ms`).
 The compose stack uses a Postgres-backed job store (`JOB_STORE_BACKEND=postgres`)
 for API/worker parity.
+`api` and `worker` load LLM-related variables from local `.env` via
+compose `env_file`, which avoids accidental shell-level key overrides.
 
 Ports:
 - API: `http://127.0.0.1:8000`
