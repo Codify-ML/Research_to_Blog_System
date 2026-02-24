@@ -5,11 +5,18 @@ aws_region = "us-west-2"
 aws_profile = "personal-aws-dev"
 route53_zone_name = "dev.vc-projects-ds.com"
 route53_zone_id = "Z03707592Y0NKCCWRSSFL"
-api_hostname = "api.vc-blog-agent.dev.vc-projects-ds.com"
-ui_hostname = "ui.vc-blog-agent.dev.vc-projects-ds.com"
+app_dns_prefix = "vc-blog-agent"
+api_dns_label = "api"
+ui_dns_label = "ui"
 cognito_domain_prefix = "vc-blog-agent-dev-auth"
 enable_https = true
 enable_ui_auth = true
+
+# Optional full host overrides. Leave empty to use derived hostnames:
+#   <api_dns_label>.<app_dns_prefix>.<route53_zone_name>
+#   <ui_dns_label>.<app_dns_prefix>.<route53_zone_name>
+api_hostname = ""
+ui_hostname = ""
 
 # Deprecated/unused: RDS master password is now managed by AWS Secrets
 # Manager.

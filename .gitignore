@@ -13,3 +13,4 @@ dump.rdb
 *.tfstate.*
 *.tfplan
 terraform.tfvars
+initial_planning/

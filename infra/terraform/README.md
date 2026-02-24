@@ -58,6 +58,28 @@ make tf-plan-dev
 `make tf-init-dev`, `make tf-validate-dev`, and `make tf-plan-dev` do not
 apply changes. Run `make tf-apply-dev` only after reviewing the plan.
 
+## Hostname Configuration
+
+By default, API/UI hostnames are derived from:
+- `route53_zone_name`
+- `app_dns_prefix`
+- `api_dns_label`
+- `ui_dns_label`
+
+Derived patterns:
+- API: `<api_dns_label>.<app_dns_prefix>.<route53_zone_name>`
+- UI: `<ui_dns_label>.<app_dns_prefix>.<route53_zone_name>`
+
+Example:
+- `route53_zone_name = "dev.vc-projects-ds.com"`
+- `app_dns_prefix = "blog-agent"`
+- Results:
+  - `api.blog-agent.dev.vc-projects-ds.com`
+  - `ui.blog-agent.dev.vc-projects-ds.com`
+
+If needed, you can still set full hostname overrides via
+`api_hostname` and `ui_hostname`.
+
 ## Cloud Portability Notes
 
 - ECS services run in private subnets with `assign_public_ip = false`.

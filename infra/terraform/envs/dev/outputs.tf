@@ -5,12 +5,12 @@ output "vpc_id" {
 
 output "api_url" {
   description = "Public URL of the API ALB."
-  value       = var.enable_https ? "https://${var.api_hostname}" : "http://${var.api_hostname}"
+  value       = var.enable_https ? "https://${local.effective_api_hostname}" : "http://${local.effective_api_hostname}"
 }
 
 output "ui_url" {
   description = "Public URL of the UI ALB."
-  value       = var.enable_https ? "https://${var.ui_hostname}" : "http://${var.ui_hostname}"
+  value       = var.enable_https ? "https://${local.effective_ui_hostname}" : "http://${local.effective_ui_hostname}"
 }
 
 output "openai_secret_arn" {
