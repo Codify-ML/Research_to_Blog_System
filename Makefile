@@ -14,6 +14,7 @@
 	image-push-dev \
 	deploy-plan-dev \
 	deploy-dev \
+	rotate-api-auth-key-dev \
 	tf-fmt \
 	tf-init-dev \
 	tf-validate-dev \
@@ -84,6 +85,7 @@ help:
 	@echo "  deploy-plan-dev Terraform plan for dev using IMAGE_TAG"
 	@echo "  deploy-dev Build/push images and apply Terraform with IMAGE_TAG"
 	@echo "              Optional IMAGE_PLATFORM (default linux/amd64)"
+	@echo "  rotate-api-auth-key-dev Rotate deployed API auth key in cloud"
 	@echo "  tf-fmt    Format Terraform files"
 	@echo "  tf-init-dev Init Terraform in infra/terraform/envs/dev"
 	@echo "  tf-validate-dev Validate Terraform config for dev"
@@ -168,6 +170,9 @@ deploy-dev: image-push-dev
 		-var-file=terraform.tfvars \
 		-var="image_tag=$(IMAGE_TAG)" \
 		-auto-approve
+
+rotate-api-auth-key-dev:
+	@bash scripts/rotate_api_auth_key_dev.sh
 
 tf-fmt:
 	terraform fmt -recursive infra/terraform
