@@ -62,6 +62,13 @@ flowchart LR
 - Docker Desktop (for container workflow)
 - AWS CLI + Terraform (for cloud workflow)
 
+Command discovery:
+```bash
+make
+# or
+make help
+```
+
 ## Quick Start (Local)
 1. Install dependencies:
 ```bash

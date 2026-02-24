@@ -42,6 +42,9 @@
 	stop-ui \
 	stop-services
 
+.DEFAULT_GOAL := help
+
+# Runtime paths and process metadata
 RUN_DIR := .run
 API_PORT := 8000
 UI_PORT := 8501
@@ -56,6 +59,8 @@ UI_CMD_PATTERN := streamlit run apps/ui/app.py --server.address 127.0.0.1 --serv
 DOCKER_COMPOSE_FILE := docker-compose.local.yml
 DOCKER_COMPOSE := docker compose -f $(DOCKER_COMPOSE_FILE)
 TF_DEV_DIR := infra/terraform/envs/dev
+
+# Cloud release defaults
 AWS_PROFILE ?= personal-aws-dev
 AWS_REGION ?= us-west-2
 AWS_ACCOUNT_ID ?= 497458934978
@@ -66,9 +71,6 @@ IMAGE_PLATFORM ?= linux/amd64
 RELEASE_SERVICES ?= api,worker,ui
 SMOKE_LLM_MODE ?= mock
 ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-API_ECR_IMAGE := $(ECR_REGISTRY)/$(PROJECT_NAME)-$(CLOUD_ENV)-api:$(IMAGE_TAG)
-WORKER_ECR_IMAGE := $(ECR_REGISTRY)/$(PROJECT_NAME)-$(CLOUD_ENV)-worker:$(IMAGE_TAG)
-UI_ECR_IMAGE := $(ECR_REGISTRY)/$(PROJECT_NAME)-$(CLOUD_ENV)-ui:$(IMAGE_TAG)
 RELEASE_CMD := uv run python scripts/release.py
 RELEASE_COMMON_ARGS := \
 	--aws-profile "$(AWS_PROFILE)" \
@@ -82,132 +84,98 @@ RELEASE_COMMON_ARGS := \
 	--image-platform "$(IMAGE_PLATFORM)" \
 	--services "$(RELEASE_SERVICES)"
 
-help:
-	@echo "Available targets:"
-	@echo "  sync      Install/update dependencies with uv"
-	@echo "  fmt       Run black formatter"
-	@echo "  lint      Run ruff checks"
-	@echo "  test      Run unit and integration tests"
-	@echo "  test-unit Alias for test"
-	@echo "  test-integration Run integration tests"
-	@echo "  test-e2e  Run UI lifecycle e2e tests"
-	@echo "  test-gate Run API readiness gate suite (Phase 4.5)"
-	@echo "  test-perf Run API enqueue latency benchmark test"
-	@echo "  ecr-login-dev Authenticate Docker to dev ECR registry"
-	@echo "  image-build-dev Build API/worker/UI images for dev"
-	@echo "  image-push-dev Build and push images to ECR (centralized)"
-	@echo "  deploy-plan-dev Terraform plan for dev using IMAGE_TAG"
-	@echo "  deploy-dev Build/push/apply/wait/smoke (centralized)"
-	@echo "              Optional IMAGE_PLATFORM (default linux/amd64)"
-	@echo "  rotate-api-auth-key-dev Rotate deployed API auth key in cloud"
-	@echo "  tf-fmt    Format Terraform files"
-	@echo "  tf-init-dev Init Terraform in infra/terraform/envs/dev"
-	@echo "  tf-validate-dev Validate Terraform config for dev"
-	@echo "  tf-plan-dev Plan Terraform changes for dev"
-	@echo "  tf-apply-dev Apply Terraform changes for dev"
-	@echo "  tf-destroy-dev Destroy Terraform resources for dev"
-	@echo "  docker-up Start local Docker stack (Phase 4)"
-	@echo "  docker-down Stop local Docker stack"
-	@echo "  docker-logs Tail local Docker stack logs"
-	@echo "  docker-ps List local Docker stack service status"
-	@echo "  docker-smoke Run API lifecycle smoke against Docker stack"
-	@echo "  docker-smoke-db Run smoke + direct Postgres persistence check"
-	@echo "  docker-smoke-openai Run OpenAI-backed API smoke in Docker"
-	@echo "  run-sync  Run the synchronous Phase 1 graph harness"
-	@echo "  run-api   Run FastAPI server in foreground (Phase 2)"
-	@echo "  run-worker Run Celery worker in foreground (Phase 2)"
-	@echo "  run-ui    Run Streamlit UI in foreground (Phase 3)"
-	@echo "  run-api-bg Start FastAPI server in background"
-	@echo "  run-worker-bg Start Celery worker in background"
-	@echo "  run-ui-bg Start Streamlit UI in background"
-	@echo "  run-services-bg Start API, worker, and UI in background"
-	@echo "  debug-openai Run simple OpenAI connectivity/key check"
-	@echo "  stop-api  Stop background API service"
-	@echo "  stop-worker Stop background worker service"
-	@echo "  stop-ui   Stop background UI service"
-	@echo "  stop-services Stop background API, worker, and UI services"
+help: ## Show available make targets.
+	@awk 'BEGIN {FS = ":.*##"; print "Usage: make <target>"} \
+		/^##@/ {print ""; print substr($$0, 5)} \
+		/^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-24s %s\n", $$1, $$2}' \
+		$(MAKEFILE_LIST)
 
-sync:
+##@ Local Development
+sync: ## Install/update dependencies with uv.
 	uv sync --all-groups
 
-fmt:
+fmt: ## Format Python code with Black.
 	uv run black .
 
-lint:
+lint: ## Run Ruff lint checks.
 	uv run ruff check .
 
-test: test-unit test-integration test-e2e
+##@ Testing
+test: test-unit test-integration test-e2e ## Run unit, integration, and e2e tests.
 
-test-unit:
+test-unit: ## Run unit tests.
 	uv run pytest tests/unit
 
-test-integration:
+test-integration: ## Run integration tests.
 	uv run pytest tests/integration
 
-test-e2e:
+test-e2e: ## Run UI lifecycle e2e tests.
 	uv run pytest tests/e2e
 
-test-gate:
+test-gate: ## Run strict pre-cloud API readiness test suite.
 	uv run pytest \
 		tests/integration/test_phase2_api_worker.py \
 		tests/integration/test_api_readiness_gate.py \
 		tests/performance/test_generate_enqueue_latency.py
 
-test-perf:
+test-perf: ## Run enqueue latency performance test.
 	uv run pytest tests/performance/test_generate_enqueue_latency.py
 
-ecr-login-dev:
+##@ Cloud Release
+ecr-login-dev: ## Authenticate Docker to the dev ECR registry.
 	@AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
 		aws ecr get-login-password | docker login \
 		--username AWS --password-stdin $(ECR_REGISTRY)
 
-image-build-dev:
+image-build-dev: ## Build API/worker/UI images for dev.
 	$(RELEASE_CMD) build $(RELEASE_COMMON_ARGS)
 
-image-push-dev:
+image-push-dev: ## Build and push images to ECR.
 	$(RELEASE_CMD) build-push $(RELEASE_COMMON_ARGS)
 
-deploy-plan-dev:
+deploy-plan-dev: ## Run Terraform plan for current IMAGE_TAG.
 	$(RELEASE_CMD) plan $(RELEASE_COMMON_ARGS)
 
-deploy-dev:
+deploy-dev: ## Build/push/apply/wait/smoke release flow.
 	$(RELEASE_CMD) deploy $(RELEASE_COMMON_ARGS) \
 		--smoke-llm-mode "$(SMOKE_LLM_MODE)"
 
-rotate-api-auth-key-dev:
+rotate-api-auth-key-dev: ## Rotate deployed API auth key in cloud.
 	@bash scripts/rotate_api_auth_key_dev.sh
 
-tf-fmt:
+##@ Terraform
+tf-fmt: ## Format Terraform files.
 	terraform fmt -recursive infra/terraform
 
-tf-init-dev:
+tf-init-dev: ## Initialize Terraform backend for dev.
 	terraform -chdir=$(TF_DEV_DIR) init -reconfigure -backend-config=backend.hcl
 
-tf-validate-dev:
+tf-validate-dev: ## Validate Terraform config for dev.
 	terraform -chdir=$(TF_DEV_DIR) validate
 
-tf-plan-dev:
+tf-plan-dev: ## Plan Terraform changes for dev.
 	terraform -chdir=$(TF_DEV_DIR) plan -var-file=terraform.tfvars
 
-tf-apply-dev:
+tf-apply-dev: ## Apply Terraform changes for dev.
 	terraform -chdir=$(TF_DEV_DIR) apply -var-file=terraform.tfvars
 
-tf-destroy-dev:
+tf-destroy-dev: ## Destroy Terraform resources for dev.
 	terraform -chdir=$(TF_DEV_DIR) destroy -var-file=terraform.tfvars
 
-docker-up:
+##@ Docker
+docker-up: ## Start local Docker stack.
 	$(DOCKER_COMPOSE) up --build -d
 
-docker-down:
+docker-down: ## Stop local Docker stack.
 	$(DOCKER_COMPOSE) down --remove-orphans
 
-docker-logs:
+docker-logs: ## Tail local Docker stack logs.
 	$(DOCKER_COMPOSE) logs -f --tail=200
 
-docker-ps:
+docker-ps: ## List local Docker stack service status.
 	$(DOCKER_COMPOSE) ps
 
-docker-smoke:
+docker-smoke: ## Run API lifecycle smoke test against Docker stack.
 	@$(DOCKER_COMPOSE) exec -T api /bin/sh -lc '\
 		resp=$$(curl -sS -X POST http://127.0.0.1:8000/generate \
 			-H "content-type: application/json" \
@@ -223,35 +191,36 @@ docker-smoke:
 				break; \
 			fi; \
 			sleep 1; \
-		done'
+			done'
 
-docker-smoke-db:
+docker-smoke-db: ## Run smoke + direct Postgres persistence check.
 	@bash scripts/docker_smoke_db_check.sh $(DOCKER_COMPOSE_FILE)
 
-docker-smoke-openai:
+docker-smoke-openai: ## Run OpenAI-backed API smoke test in Docker.
 	@bash scripts/docker_smoke_openai_check.sh $(DOCKER_COMPOSE_FILE)
 
-run-sync:
+##@ Runtime
+run-sync: ## Run synchronous graph harness.
 	@mkdir -p $(RUN_DIR)
 	@env UV_CACHE_DIR=$(UV_CACHE_DIR) \
 		uv run python -m apps.run_phase1_sync "AI agents in production"
 
-run-api:
+run-api: ## Run FastAPI server in foreground.
 	@mkdir -p $(RUN_DIR)
 	@env UV_CACHE_DIR=$(UV_CACHE_DIR) uv run $(API_CMD_PATTERN)
 
-run-worker:
+run-worker: ## Run Celery worker in foreground.
 	@mkdir -p $(RUN_DIR)
 	@env UV_CACHE_DIR=$(UV_CACHE_DIR) \
 		uv run celery -A apps.worker.app.celery_app:celery_app worker -l info
 
-run-ui:
+run-ui: ## Run Streamlit UI in foreground.
 	@mkdir -p $(RUN_DIR)
 	@mkdir -p $(UI_HOME)
 	@env HOME=$(UI_HOME) UV_CACHE_DIR=$(UV_CACHE_DIR) \
 		uv run $(UI_CMD_PATTERN)
 
-run-api-bg:
+run-api-bg: ## Start FastAPI server in background.
 	@mkdir -p $(RUN_DIR)
 	@if [ -f $(API_PID_FILE) ] && kill -0 $$(cat $(API_PID_FILE)) 2>/dev/null; then \
 		echo "API already running with PID $$(cat $(API_PID_FILE))"; \
@@ -261,7 +230,7 @@ run-api-bg:
 		> $(RUN_DIR)/api.log 2>&1 & echo $$! > $(API_PID_FILE)
 	@echo "API started with PID $$(cat $(API_PID_FILE))"
 
-run-worker-bg:
+run-worker-bg: ## Start Celery worker in background.
 	@mkdir -p $(RUN_DIR)
 	@if [ -f $(WORKER_PID_FILE) ] && kill -0 $$(cat $(WORKER_PID_FILE)) 2>/dev/null; then \
 		echo "Worker already running with PID $$(cat $(WORKER_PID_FILE))"; \
@@ -271,7 +240,7 @@ run-worker-bg:
 		> $(RUN_DIR)/worker.log 2>&1 & echo $$! > $(WORKER_PID_FILE)
 	@echo "Worker started with PID $$(cat $(WORKER_PID_FILE))"
 
-run-ui-bg:
+run-ui-bg: ## Start Streamlit UI in background.
 	@mkdir -p $(RUN_DIR)
 	@mkdir -p $(UI_HOME)
 	@if [ -f $(UI_PID_FILE) ] && kill -0 $$(cat $(UI_PID_FILE)) 2>/dev/null; then \
@@ -282,12 +251,13 @@ run-ui-bg:
 		> $(RUN_DIR)/ui.log 2>&1 & echo $$! > $(UI_PID_FILE)
 	@echo "UI started with PID $$(cat $(UI_PID_FILE))"
 
-run-services-bg: run-api-bg run-worker-bg run-ui-bg
+run-services-bg: run-api-bg run-worker-bg run-ui-bg ## Start API, worker, and UI in background.
 
-debug-openai:
+debug-openai: ## Run simple OpenAI connectivity and key check.
 	uv run python scripts/debug_openai.py
 
-stop-api:
+##@ Runtime Cleanup
+stop-api: ## Stop API background process(es).
 	@stopped=0; \
 	if [ -f $(API_PID_FILE) ]; then \
 		PID=$$(cat $(API_PID_FILE)); \
@@ -331,7 +301,7 @@ stop-api:
 		echo "No API process found"; \
 	fi
 
-stop-worker:
+stop-worker: ## Stop worker background process(es).
 	@stopped=0; \
 	if [ -f $(WORKER_PID_FILE) ]; then \
 		PID=$$(cat $(WORKER_PID_FILE)); \
@@ -372,7 +342,7 @@ stop-worker:
 		echo "No worker process found"; \
 	fi
 
-stop-ui:
+stop-ui: ## Stop UI background process(es).
 	@stopped=0; \
 	if [ -f $(UI_PID_FILE) ]; then \
 		PID=$$(cat $(UI_PID_FILE)); \
@@ -416,4 +386,4 @@ stop-ui:
 		echo "No UI process found"; \
 	fi
 
-stop-services: stop-api stop-worker stop-ui
+stop-services: stop-api stop-worker stop-ui ## Stop API, worker, and UI background processes.
