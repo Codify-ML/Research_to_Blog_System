@@ -1,6 +1,19 @@
 locals {
-  name_prefix   = "${var.project_name}-${var.environment}"
-  secret_prefix = "${var.project_name}/${var.environment}"
+  name_prefix            = "${var.project_name}-${var.environment}"
+  secret_prefix          = "${var.project_name}/${var.environment}"
+  route53_zone_name_base = trimsuffix(trimspace(var.route53_zone_name), ".")
+  default_api_hostname   = "${trimspace(var.api_dns_label)}.${trimspace(var.app_dns_prefix)}.${local.route53_zone_name_base}"
+  default_ui_hostname    = "${trimspace(var.ui_dns_label)}.${trimspace(var.app_dns_prefix)}.${local.route53_zone_name_base}"
+  effective_api_hostname = (
+    trimspace(var.api_hostname) != ""
+    ? trimsuffix(trimspace(var.api_hostname), ".")
+    : local.default_api_hostname
+  )
+  effective_ui_hostname = (
+    trimspace(var.ui_hostname) != ""
+    ? trimsuffix(trimspace(var.ui_hostname), ".")
+    : local.default_ui_hostname
+  )
 }
 
 data "aws_route53_zone" "selected" {
@@ -8,6 +21,23 @@ data "aws_route53_zone" "selected" {
 }
 
 data "aws_caller_identity" "current" {}
+
+check "route53_zone_consistency" {
+  assert {
+    condition = (
+      trimsuffix(data.aws_route53_zone.selected.name, ".")
+      == local.route53_zone_name_base
+    )
+    error_message = "route53_zone_id does not match route53_zone_name."
+  }
+}
+
+check "api_ui_hostnames_distinct" {
+  assert {
+    condition     = local.effective_api_hostname != local.effective_ui_hostname
+    error_message = "API and UI hostnames must be different."
+  }
+}
 
 module "network" {
   source = "../../modules/network"
@@ -33,9 +63,13 @@ module "ecr" {
 }
 
 resource "aws_acm_certificate" "app" {
-  domain_name               = var.ui_hostname
-  subject_alternative_names = [var.api_hostname]
+  domain_name               = local.effective_ui_hostname
+  subject_alternative_names = [local.effective_api_hostname]
   validation_method         = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_route53_record" "cert_validation" {
@@ -47,11 +81,12 @@ resource "aws_route53_record" "cert_validation" {
     }
   }
 
-  zone_id = data.aws_route53_zone.selected.zone_id
-  name    = each.value.name
-  type    = each.value.type
-  ttl     = 60
-  records = [each.value.record]
+  zone_id         = data.aws_route53_zone.selected.zone_id
+  name            = each.value.name
+  type            = each.value.type
+  allow_overwrite = true
+  ttl             = 60
+  records         = [each.value.record]
 }
 
 resource "aws_acm_certificate_validation" "app" {
@@ -86,8 +121,8 @@ resource "aws_cognito_user_pool_client" "ui" {
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["openid", "email", "profile"]
-  callback_urls                        = ["https://${var.ui_hostname}/oauth2/idpresponse"]
-  logout_urls                          = ["https://${var.ui_hostname}/"]
+  callback_urls                        = ["https://${local.effective_ui_hostname}/oauth2/idpresponse"]
+  logout_urls                          = ["https://${local.effective_ui_hostname}/"]
   supported_identity_providers         = ["COGNITO"]
 
   generate_secret = true
@@ -188,7 +223,7 @@ module "compute" {
   api_image                      = var.api_image != "" ? var.api_image : "${module.ecr.api_repository_url}:${var.image_tag}"
   worker_image                   = var.worker_image != "" ? var.worker_image : "${module.ecr.worker_repository_url}:${var.image_tag}"
   ui_image                       = var.ui_image != "" ? var.ui_image : "${module.ecr.ui_repository_url}:${var.image_tag}"
-  api_base_url                   = var.enable_https ? "https://${var.api_hostname}" : "http://${var.api_hostname}"
+  api_base_url                   = var.enable_https ? "https://${local.effective_api_hostname}" : "http://${local.effective_api_hostname}"
   api_auth_enabled               = var.api_auth_enabled
   use_mock_llm                   = var.use_mock_llm
   mock_mode_strict               = var.mock_mode_strict
@@ -196,7 +231,7 @@ module "compute" {
   openai_model_writer            = var.openai_model_writer
   openai_model_editor            = var.openai_model_editor
   ui_cognito_hosted_ui_base      = "https://${aws_cognito_user_pool_domain.ui.domain}.auth.${var.aws_region}.amazoncognito.com"
-  ui_public_base_url             = var.enable_https ? "https://${var.ui_hostname}" : "http://${var.ui_hostname}"
+  ui_public_base_url             = var.enable_https ? "https://${local.effective_ui_hostname}" : "http://${local.effective_ui_hostname}"
   enable_https                   = var.enable_https
   certificate_arn                = aws_acm_certificate_validation.app.certificate_arn
   enable_ui_auth                 = var.enable_ui_auth
@@ -206,9 +241,10 @@ module "compute" {
 }
 
 resource "aws_route53_record" "api" {
-  zone_id = data.aws_route53_zone.selected.zone_id
-  name    = var.api_hostname
-  type    = "A"
+  zone_id         = data.aws_route53_zone.selected.zone_id
+  name            = local.effective_api_hostname
+  type            = "A"
+  allow_overwrite = true
 
   alias {
     name                   = module.compute.api_alb_dns_name
@@ -218,9 +254,10 @@ resource "aws_route53_record" "api" {
 }
 
 resource "aws_route53_record" "ui" {
-  zone_id = data.aws_route53_zone.selected.zone_id
-  name    = var.ui_hostname
-  type    = "A"
+  zone_id         = data.aws_route53_zone.selected.zone_id
+  name            = local.effective_ui_hostname
+  type            = "A"
+  allow_overwrite = true
 
   alias {
     name                   = module.compute.ui_alb_dns_name

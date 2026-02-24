@@ -14,6 +14,14 @@ variable "route53_zone_name" {
   description = "Route53 hosted zone name for app records."
   type        = string
   default     = "dev.vc-projects-ds.com"
+
+  validation {
+    condition = (
+      trimspace(var.route53_zone_name) != ""
+      && can(regex("^[A-Za-z0-9.-]+\\.?$", trimspace(var.route53_zone_name)))
+    )
+    error_message = "route53_zone_name must be a valid DNS zone name."
+  }
 }
 
 variable "route53_zone_id" {
@@ -22,16 +30,80 @@ variable "route53_zone_id" {
   default     = "Z03707592Y0NKCCWRSSFL"
 }
 
-variable "api_hostname" {
-  description = "Public API DNS hostname."
+variable "app_dns_prefix" {
+  description = "Shared DNS prefix for API/UI hostnames under route53_zone_name."
   type        = string
-  default     = "api.vc-blog-agent.dev.vc-projects-ds.com"
+  default     = "vc-blog-agent"
+
+  validation {
+    condition = (
+      trimspace(var.app_dns_prefix) != ""
+      && can(regex("^[a-z0-9-]+$", trimspace(var.app_dns_prefix)))
+    )
+    error_message = "app_dns_prefix must contain only lowercase letters, digits, or hyphens."
+  }
+}
+
+variable "api_dns_label" {
+  description = "DNS label used for the API hostname."
+  type        = string
+  default     = "api"
+
+  validation {
+    condition = (
+      trimspace(var.api_dns_label) != ""
+      && can(regex("^[a-z0-9-]+$", trimspace(var.api_dns_label)))
+    )
+    error_message = "api_dns_label must contain only lowercase letters, digits, or hyphens."
+  }
+}
+
+variable "ui_dns_label" {
+  description = "DNS label used for the UI hostname."
+  type        = string
+  default     = "ui"
+
+  validation {
+    condition = (
+      trimspace(var.ui_dns_label) != ""
+      && can(regex("^[a-z0-9-]+$", trimspace(var.ui_dns_label)))
+    )
+    error_message = "ui_dns_label must contain only lowercase letters, digits, or hyphens."
+  }
+}
+
+variable "api_hostname" {
+  description = "Optional full API hostname override. Defaults to derived value when empty."
+  type        = string
+  default     = ""
+
+  validation {
+    condition = (
+      trimspace(var.api_hostname) == ""
+      || endswith(
+        trimsuffix(lower(trimspace(var.api_hostname)), "."),
+        trimsuffix(lower(trimspace(var.route53_zone_name)), "."),
+      )
+    )
+    error_message = "api_hostname must end with route53_zone_name when set."
+  }
 }
 
 variable "ui_hostname" {
-  description = "Public UI DNS hostname."
+  description = "Optional full UI hostname override. Defaults to derived value when empty."
   type        = string
-  default     = "ui.vc-blog-agent.dev.vc-projects-ds.com"
+  default     = ""
+
+  validation {
+    condition = (
+      trimspace(var.ui_hostname) == ""
+      || endswith(
+        trimsuffix(lower(trimspace(var.ui_hostname)), "."),
+        trimsuffix(lower(trimspace(var.route53_zone_name)), "."),
+      )
+    )
+    error_message = "ui_hostname must end with route53_zone_name when set."
+  }
 }
 
 variable "aws_region" {
