@@ -57,6 +57,27 @@ def _build_signout_url() -> str | None:
     return f"{public_base}/auth/logout"
 
 
+def _classify_ui_error(
+    *,
+    error_message: str,
+    error_code: str | None,
+) -> tuple[str, str]:
+    if error_code == "POLICY_BLOCKED_INPUT":
+        return (
+            "warning",
+            "Request blocked by safety policy. "
+            "Please revise your prompt and try again.\n\n"
+            f"Details: {error_message}",
+        )
+    if error_code == "SAFETY_UNAVAILABLE":
+        return (
+            "error",
+            "Safety checks are temporarily unavailable. "
+            "Please retry shortly.",
+        )
+    return ("error", error_message)
+
+
 def _render_navigation_button(*, label: str, url: str) -> None:
     safe_label = escape(label)
     safe_url = escape(url, quote=True)
@@ -133,7 +154,10 @@ def _fetch_status(client: ApiClient, job_id: str):
     try:
         payload = client.get_status(job_id)
     except ApiClientError as exc:
-        st.session_state["ui_error"] = str(exc)
+        st.session_state["ui_error"] = {
+            "message": str(exc),
+            "code": exc.error_code,
+        }
         return None
 
     st.session_state["latest_status"] = payload
@@ -250,7 +274,10 @@ def main() -> None:
 
     if submitted:
         if not topic.strip():
-            st.session_state["ui_error"] = "Topic cannot be blank."
+            st.session_state["ui_error"] = {
+                "message": "Topic cannot be blank.",
+                "code": "LOCAL_VALIDATION",
+            }
         else:
             _clear_active_run()
             selected_mode = (
@@ -272,13 +299,35 @@ def main() -> None:
                 )
                 st.success("Job submitted successfully.")
             except ApiClientError as exc:
-                st.session_state["ui_error"] = str(exc)
+                st.session_state["ui_error"] = {
+                    "message": str(exc),
+                    "code": exc.error_code,
+                }
 
     job_id = st.session_state["active_job_id"]
     latest_status = st.session_state["latest_status"]
 
-    if st.session_state["ui_error"]:
-        st.error(st.session_state["ui_error"])
+    ui_error = st.session_state["ui_error"]
+    if ui_error:
+        if isinstance(ui_error, dict):
+            level, rendered = _classify_ui_error(
+                error_message=str(ui_error.get("message", "Unknown error.")),
+                error_code=(
+                    str(ui_error["code"])
+                    if ui_error.get("code") is not None
+                    else None
+                ),
+            )
+        else:
+            level, rendered = _classify_ui_error(
+                error_message=str(ui_error),
+                error_code=None,
+            )
+
+        if level == "warning":
+            st.warning(rendered)
+        else:
+            st.error(rendered)
 
     if not job_id:
         st.info("Submit a topic to start a job.")
