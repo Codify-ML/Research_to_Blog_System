@@ -15,6 +15,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("MOCK_MODE_STRICT", "true")
     monkeypatch.setenv("API_AUTH_ENABLED", "false")
     monkeypatch.delenv("API_AUTH_KEY", raising=False)
+    monkeypatch.setenv("SAFETY_OPENAI_MODERATION_ENABLED", "false")
+    monkeypatch.setenv("SAFETY_FAIL_CLOSED", "false")
     monkeypatch.setenv("LLM_MAX_RETRIES", "2")
     monkeypatch.setenv("LLM_BASE_BACKOFF_SECONDS", "0")
     monkeypatch.setenv("LLM_MAX_BACKOFF_SECONDS", "0")
