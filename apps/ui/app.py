@@ -178,10 +178,11 @@ def main() -> None:
     settings = get_ui_settings()
     client = _build_client()
 
-    st.set_page_config(page_title="Research to Blog UI", layout="wide")
+    st.set_page_config(page_title="Research-to-Blog Studio", layout="wide")
     header_col, signout_col = st.columns([7.2, 1.2])
     with header_col:
-        st.title("Research to Blog - Phase 3 UI")
+        st.title("Research-to-Blog Studio")
+        st.caption("From web-grounded notes to publish-ready drafts")
     sign_out_url = _build_signout_url()
     if sign_out_url is not None:
         with signout_col:
