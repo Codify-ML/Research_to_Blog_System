@@ -284,5 +284,5 @@ class PostgresJobStore(BaseJobStore):
 def get_job_store() -> JobStore:
     settings = get_settings()
     if settings.job_store_backend == "postgres":
-        return PostgresJobStore(settings.database_url)
+        return PostgresJobStore(settings.resolved_database_url)
     return SQLiteJobStore(settings.job_store_path)

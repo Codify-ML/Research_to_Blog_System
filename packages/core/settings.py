@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import quote_plus
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,9 +27,12 @@ class Settings(BaseSettings):
     research_function_tools_enabled: bool = True
 
     redis_url: str = "redis://localhost:6379/0"
-    database_url: str = (
-        "postgresql://postgres:postgres@localhost:5432/research_blog"
-    )
+    database_url: str | None = None
+    db_host: str = "localhost"
+    db_port: int = 5432
+    db_name: str = "research_blog"
+    db_user: str = "postgres"
+    db_password: str | None = None
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
     job_store_backend: Literal["sqlite", "postgres"] = "sqlite"
@@ -52,7 +56,27 @@ class Settings(BaseSettings):
             raise ValueError(
                 "API_AUTH_KEY is required when API_AUTH_ENABLED is true."
             )
+        if self.job_store_backend == "postgres":
+            _ = self.resolved_database_url
         return self
+
+    @property
+    def resolved_database_url(self) -> str:
+        if self.database_url and self.database_url.strip():
+            return self.database_url
+
+        if not self.db_password:
+            raise ValueError(
+                "DB_PASSWORD is required when JOB_STORE_BACKEND is postgres "
+                "and DATABASE_URL is not set."
+            )
+
+        db_user = quote_plus(self.db_user)
+        db_password = quote_plus(self.db_password)
+        return (
+            f"postgresql://{db_user}:{db_password}@"
+            f"{self.db_host}:{self.db_port}/{self.db_name}"
+        )
 
 
 @lru_cache(maxsize=1)
