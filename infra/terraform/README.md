@@ -1,7 +1,30 @@
-# Terraform (Phase 5 Scaffold)
+# Terraform Deployment Guide
 
-This directory contains the initial cloud deployment scaffold for the
+This directory contains the AWS infrastructure definition for the
 Research-to-Blog system.
+
+## Cloud System Diagram
+
+```mermaid
+flowchart LR
+    User["User Browser"] --> R53["Route53"]
+    R53 --> UIALB["UI ALB"]
+    R53 --> APIALB["API ALB"]
+    UIALB -->|"authenticate-cognito"| COG["Cognito Hosted UI"]
+    UIALB --> UITask["UI ECS Service"]
+    UITask --> APIALB
+    APIALB --> APITask["API ECS Service"]
+    APITask --> Redis["ElastiCache Redis"]
+    Redis --> Worker["Worker ECS Service"]
+    APITask --> PG["RDS Postgres"]
+    Worker --> PG
+    APITask --> Secrets["Secrets Manager"]
+    Worker --> Secrets
+    APITask --> OAI["OpenAI API"]
+    Worker --> OAI
+    WAF["WAF"] --> UIALB
+    WAF --> APIALB
+```
 
 ## Layout
 
@@ -32,7 +55,8 @@ make tf-validate-dev
 make tf-plan-dev
 ```
 
-No `apply` is run automatically. Review the plan first.
+`make tf-init-dev`, `make tf-validate-dev`, and `make tf-plan-dev` do not
+apply changes. Run `make tf-apply-dev` only after reviewing the plan.
 
 ## Cloud Portability Notes
 
@@ -53,11 +77,10 @@ No `apply` is run automatically. Review the plan first.
 - If `api_image`, `worker_image`, and `ui_image` are empty, Terraform
   composes image URIs from created ECR repositories and `image_tag`.
 
-## RDS Secret Migration Note
+## Database Secret Migration Note
 
-For existing stacks that previously used plaintext `db_password`, run apply
-twice during migration:
-
+For older stacks that previously used plaintext `db_password`, run apply twice
+during migration:
 1. First apply enables `manage_master_user_password` on RDS.
 2. Second apply wires ECS DB secret injection and IAM access using the now
    available RDS secret ARN.

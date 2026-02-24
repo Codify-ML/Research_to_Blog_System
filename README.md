@@ -1,52 +1,98 @@
 # Research to Blog System
 
-Multi-agent research-to-blog pipeline with local runtime, Docker parity,
-pre-cloud API gate checks, and Terraform/ECS deployment automation.
+Research to Blog System is a multi-agent content pipeline that turns a topic
+into structured research notes, a draft, and editorial feedback. It includes a
+local developer workflow, a Dockerized stack for runtime parity, and cloud
+deployment automation for AWS.
 
-## Phase 1 Scope
-- LangGraph core workflow (Researcher -> Writer -> Editor -> Escalation)
-- Deterministic routing guard to prevent infinite revision loops
-- Pydantic validation for editor decisions
-- Local synchronous run path with MemorySaver
-- Unit tests for schema, routing, and workflow behavior
+This repository is designed to show how to move a multi-agent system from
+localhost experimentation to a production-style cloud deployment with clear
+contracts, reproducible infrastructure, and scalable runtime components.
 
-## Phase 2 Scope
-- FastAPI async API (`POST /generate`, `GET /status/{job_id}`)
-- Celery worker task integration
-- SQLite-backed local job store for status lifecycle
-- Integration tests for API contracts, lifecycle, retries, and errors
+## What This Project Showcases
+- How to design a multi-agent workflow with explicit roles and guardrails.
+- How to expose that workflow behind an async API + background worker pattern.
+- How to test behavior and reliability locally before cloud rollout.
+- How to keep local and cloud topology aligned (API, worker, queue, database,
+  UI).
+- How to deploy and operate the same system on AWS using Terraform, ECS, and
+  managed services.
 
-## Phase 3 Scope
-- Streamlit UI for topic submission and status polling
-- Status panel with lifecycle, notes, feedback, and current draft
-- Terminal-state handling for `COMPLETED`, `FAILED`, and `ESCALATED`
-- Advanced controls for source cap, tone, length, and research depth
-- Unit tests for UI API client and status helpers
+## Example Use Cases
+- Generate a blog draft from a topic with grounded research notes.
+- Produce different content variants (for example, professional article vs.
+  short social post) by changing tone/length/context controls.
+- Run mock mode for fast development loops, then switch to OpenAI mode for
+  realistic output.
+- Demonstrate a full system design interview/project:
+  local prototype -> containerized runtime -> cloud deployment.
 
-## Prerequisites
-- Python 3.11+
-- `uv` installed
+## System Diagram
 
-## Quickstart
-```bash
-make sync
-make lint
-make test
-make run-sync
+```mermaid
+flowchart LR
+    U["User"] --> UI["Streamlit UI"]
+    UI -->|"POST /generate"| API["FastAPI API"]
+    UI -->|"GET /status/:job_id"| API
+    API -->|"enqueue job"| R["Redis Broker"]
+    R --> W["Celery Worker"]
+    W --> G["LangGraph Workflow: Researcher -> Writer -> Editor"]
+    W --> DB["Job Store: SQLite or Postgres"]
+    API --> DB
+    G --> OAI["OpenAI API (optional)"]
+    G --> WS["Web Search and Function Tools (optional)"]
 ```
 
-### Phase 2 local services
+## What You Get
+- Multi-agent workflow (`Researcher -> Writer -> Editor`) with deterministic
+  revision guardrails and escalation.
+- Async job API with lifecycle polling:
+  `POST /generate` and `GET /status/{job_id}`.
+- Worker-based background execution with retries.
+- Streamlit UI for submissions, status tracking, and copy-friendly outputs.
+- Optional OpenAI execution mode plus mock mode for fast test loops.
+- Docker Compose stack with Redis and Postgres for local parity.
+- Terraform-based AWS deployment (ECS/Fargate, ALB, Route53, ACM, Cognito,
+  WAF, Secrets Manager, RDS, ElastiCache, ECR).
+- CI workflow for build/plan on PRs and controlled deploy workflows.
+
+## Prerequisites
+- Python `3.11+`
+- `uv`
+- Docker Desktop (for container workflow)
+- AWS CLI + Terraform (for cloud workflow)
+
+## Quick Start (Local)
+1. Install dependencies:
+```bash
+make sync
+```
+2. Create local env file:
+```bash
+cp .env.example .env
+```
+3. Run quality checks:
+```bash
+make lint
+make test
+```
+4. Run API + worker:
 ```bash
 make run-api
 make run-worker
 ```
-
-### Phase 3 local UI
+5. Run UI (new terminal):
 ```bash
 make run-ui
 ```
 
-### Phase 4 local Docker stack
+Default local URLs:
+- API: `http://127.0.0.1:8000`
+- UI: `http://127.0.0.1:8501`
+
+## Local Docker Stack
+Use Docker when you want local behavior close to cloud runtime.
+
 ```bash
 make docker-up
 make docker-ps
@@ -56,129 +102,98 @@ make docker-smoke-openai
 make test-gate
 make docker-down
 ```
-`make docker-smoke` executes inside the API container to validate
-enqueue/poll lifecycle using the compose network directly.
-`make docker-smoke-db` extends this with a direct `psql` check
-against Postgres to confirm the corresponding `jobs` row was persisted
-with terminal status and transition history.
-`make docker-smoke-openai` verifies an end-to-end Docker run with
-`llm_mode=openai` (requires `OPENAI_API_KEY` in `.env` or compose
-`--env-file`).
-`make test-gate` runs the Phase 4.5 pre-cloud API readiness suite
-(strict API contracts, lifecycle/idempotency checks, reliability checks,
-and enqueue latency benchmark with `p95 < 500ms`).
-The compose stack uses a Postgres-backed job store (`JOB_STORE_BACKEND=postgres`)
-for API/worker parity.
-`api` and `worker` load LLM-related variables from local `.env` via
-compose `env_file`, which avoids accidental shell-level key overrides.
 
-### Phase 5 Terraform (dev scaffold)
+Notes:
+- `make docker-smoke`: validates async enqueue + status lifecycle.
+- `make docker-smoke-db`: validates persisted `jobs` row/state in Postgres.
+- `make docker-smoke-openai`: validates end-to-end OpenAI mode in containers.
+- `make test-gate`: runs strict API readiness checks and enqueue latency tests.
+
+## LLM Modes and Research Controls
+Global runtime modes:
+- Mock mode: `USE_MOCK_LLM=true`
+- OpenAI mode: `USE_MOCK_LLM=false` with `OPENAI_API_KEY`
+
+Optional safety lock:
+- `MOCK_MODE_STRICT=true` forces mock-only behavior.
+
+Researcher controls:
+- `RESEARCH_WEB_SEARCH_ENABLED=true`
+- `RESEARCH_FUNCTION_TOOLS_ENABLED=true`
+
+In the UI, each request can also set:
+- LLM mode (`Mock LLM` or `OpenAI LLM`)
+- Max sources
+- Content type/context
+- Tone
+- Length preference
+- Research depth
+
+## API Contract (High Level)
+- `POST /generate`
+  - accepts topic and content controls
+  - returns quickly with job metadata (`job_id`, `PENDING`)
+- `GET /status/{job_id}`
+  - returns lifecycle status and artifacts (`research_notes`, `draft`,
+    `editor_feedback`, etc.)
+  - stable under repeated polling
+
+Standard error behavior is implemented for:
+- validation failures (`422`)
+- missing jobs (`404`)
+- queue unavailable (`503`)
+- unexpected failures (`500` with traceable metadata)
+
+## Cloud Deployment (AWS)
+1. Bootstrap variables:
 ```bash
 cp infra/terraform/envs/dev/terraform.tfvars.example \
   infra/terraform/envs/dev/terraform.tfvars
+```
+2. Initialize and validate:
+```bash
 make tf-init-dev
 make tf-validate-dev
 make tf-plan-dev
 ```
-No Terraform apply is executed by the `tf-init-dev` / `tf-validate-dev` /
-`tf-plan-dev` commands.
-These `tf-*` commands only initialize/validate/plan unless you run
-`make tf-apply-dev` explicitly.
-Current dev scaffold behavior:
-- S3 backend uses lockfile-based state locking.
-- ECS services are placed in private subnets (no public task IPs).
-- NAT is enabled by default for private egress portability.
-- ECR repositories are provisioned by Terraform.
-- Cloud release automation is centralized in `scripts/release.py`,
-  with GitHub Actions orchestration in
-  `.github/workflows/build-and-push-images.yml`.
-- Terraform now scaffolds Route53 + ACM HTTPS, UI Cognito login
-  (`authenticate-cognito`), and WAF association for both ALBs.
-
-Cloud image/deploy workflow (Makefile wrappers):
+3. Optional manual apply:
 ```bash
-# Build images with an immutable tag
+make tf-apply-dev
+```
+
+Image/deploy workflow via Makefile wrappers:
+```bash
 IMAGE_TAG=$(git rev-parse --short HEAD) make image-build-dev
-
-# Build + push images to ECR
 IMAGE_TAG=$(git rev-parse --short HEAD) make image-push-dev
-
-# Preview infra/service changes with that tag
 IMAGE_TAG=$(git rev-parse --short HEAD) make deploy-plan-dev
-
-# Build, push, apply Terraform, wait for ECS stability, and run smoke
 IMAGE_TAG=$(git rev-parse --short HEAD) make deploy-dev
 ```
-GitHub Actions dynamic environment behavior:
-- The release job binds to a GitHub Environment (`dev` by default).
-- It reads vars/secrets from that environment (`vars.*`, `secrets.*`).
-- Manual `workflow_dispatch` can run `build-push`, `plan`, `deploy`,
-  or `smoke` via the same `scripts/release.py` entrypoint.
-- `pull_request` (targeting `main`) runs `build` + `plan`.
-- `push` on non-`main` branches runs `build` + `plan`.
-- `push` on `main` runs full `deploy` (build/push/apply/wait/smoke).
-- CI validation procedure:
-  `docs/ci_validation_runbook.md`.
 
-By default, release targets use:
-- `AWS_PROFILE=personal-aws-dev`
-- `AWS_REGION=us-west-2`
-- `AWS_ACCOUNT_ID=497458934978`
-- `PROJECT_NAME=vc-blog-agent`
-- `CLOUD_ENV=dev`
-- `IMAGE_TAG=latest` (override recommended for real deployments)
+See:
+- `infra/terraform/README.md`
+- `infra/terraform/authentication_runbook.md`
 
-Ports:
-- API: `http://127.0.0.1:8000`
-- UI: `http://127.0.0.1:8501`
+## CI/CD Behavior
+Workflow file:
+- `.github/workflows/build-and-push-images.yml`
 
-### Background service control
+Behavior:
+- PRs to `main`: build + Terraform plan validation.
+- Non-`main` pushes: build + plan by default.
+- `main` pushes: full deploy path (build/push/apply/stabilize/smoke).
+- Optional feature-branch deploy override is supported via environment vars.
+
+Validation guide:
+- `docs/ci_validation_runbook.md`
+
+## Security and Secrets
+- Never commit `.env`, `terraform.tfvars`, or real secret values.
+- Use `.env.example` as template only.
+- Cloud secrets (OpenAI key, API auth key, DB credentials) should come from
+  AWS Secrets Manager.
+- Rotate API shared key with:
 ```bash
-make run-services-bg
-make run-ui-bg
-make stop-services
+make rotate-api-auth-key-dev
 ```
-
-## LLM Mode
-The project supports two execution modes for agent LLM calls:
-- Mock mode (default): `USE_MOCK_LLM=true`
-- Real OpenAI mode: `USE_MOCK_LLM=false` and set `OPENAI_API_KEY`
-
-When using the Phase 3 UI, each submitted job can override runtime mode:
-- `Mock LLM`
-- `OpenAI LLM`
-
-Optional strict safety flag:
-- `MOCK_MODE_STRICT=true` forces mock-only behavior
-  (cannot be combined with `USE_MOCK_LLM=false`).
-
-Researcher tool controls:
-- `RESEARCH_WEB_SEARCH_ENABLED=true` enables web search tool availability.
-- `RESEARCH_FUNCTION_TOOLS_ENABLED=true` enables function-calling helpers
-  for source normalization and scoring.
-- Tool usage is still conditional: the researcher only gets tools for
-  topics that appear time-sensitive or freshness-dependent.
-- For freshness-critical topics (for example `now`, `latest`, market/stock
-  prompts), the researcher enforces a recency policy and prefers very recent
-  sources.
-- UI status now shows `research_tools_used` so you can verify if tools were
-  invoked in a run.
-- UI exposes `research_depth` (`light`, `standard`, `deep`) to control how
-  much breadth/depth the Researcher should produce in notes.
-
-## Key Files
-- `packages/core/settings.py`
-- `packages/graph/state.py`
-- `packages/graph/schemas.py`
-- `packages/graph/nodes.py`
-- `packages/graph/router.py`
-- `packages/graph/workflow.py`
-- `apps/run_phase1_sync.py`
-- `apps/ui/app.py`
-- `apps/ui/api_client.py`
-- `tests/unit/`
-
-## Architecture Reference
-- Architecture planning notes are maintained in the local
-  `initial_planning/` workspace during planning phases. That workspace is
-  local-only and intentionally not committed to this repository.
+- Review `.gitignore` before commits and keep secret scans in your release
+  checklist.
