@@ -85,12 +85,14 @@ Current dev scaffold behavior:
 - S3 backend uses lockfile-based state locking.
 - ECS services are placed in private subnets (no public task IPs).
 - NAT is enabled by default for private egress portability.
-- ECR repositories are provisioned by Terraform, and CI image pipeline
-  is scaffolded in `.github/workflows/build-and-push-images.yml`.
+- ECR repositories are provisioned by Terraform.
+- Cloud release automation is centralized in `scripts/release.py`,
+  with GitHub Actions orchestration in
+  `.github/workflows/build-and-push-images.yml`.
 - Terraform now scaffolds Route53 + ACM HTTPS, UI Cognito login
   (`authenticate-cognito`), and WAF association for both ALBs.
 
-Cloud image build/deploy workflow (Makefile):
+Cloud image/deploy workflow (Makefile wrappers):
 ```bash
 # Build images with an immutable tag
 IMAGE_TAG=$(git rev-parse --short HEAD) make image-build-dev
@@ -101,10 +103,16 @@ IMAGE_TAG=$(git rev-parse --short HEAD) make image-push-dev
 # Preview infra/service changes with that tag
 IMAGE_TAG=$(git rev-parse --short HEAD) make deploy-plan-dev
 
-# Push images and deploy ECS task definitions with that tag
+# Build, push, apply Terraform, wait for ECS stability, and run smoke
 IMAGE_TAG=$(git rev-parse --short HEAD) make deploy-dev
 ```
-By default, image targets use:
+GitHub Actions dynamic environment behavior:
+- The release job binds to a GitHub Environment (`dev` by default).
+- It reads vars/secrets from that environment (`vars.*`, `secrets.*`).
+- Manual `workflow_dispatch` can run `build-push`, `plan`, `deploy`,
+  or `smoke` via the same `scripts/release.py` entrypoint.
+
+By default, release targets use:
 - `AWS_PROFILE=personal-aws-dev`
 - `AWS_REGION=us-west-2`
 - `AWS_ACCOUNT_ID=497458934978`

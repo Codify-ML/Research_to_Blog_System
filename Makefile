@@ -63,10 +63,24 @@ PROJECT_NAME ?= vc-blog-agent
 CLOUD_ENV ?= dev
 IMAGE_TAG ?= latest
 IMAGE_PLATFORM ?= linux/amd64
+RELEASE_SERVICES ?= api,worker,ui
+SMOKE_LLM_MODE ?= mock
 ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 API_ECR_IMAGE := $(ECR_REGISTRY)/$(PROJECT_NAME)-$(CLOUD_ENV)-api:$(IMAGE_TAG)
 WORKER_ECR_IMAGE := $(ECR_REGISTRY)/$(PROJECT_NAME)-$(CLOUD_ENV)-worker:$(IMAGE_TAG)
 UI_ECR_IMAGE := $(ECR_REGISTRY)/$(PROJECT_NAME)-$(CLOUD_ENV)-ui:$(IMAGE_TAG)
+RELEASE_CMD := uv run python scripts/release.py
+RELEASE_COMMON_ARGS := \
+	--aws-profile "$(AWS_PROFILE)" \
+	--aws-region "$(AWS_REGION)" \
+	--aws-account-id "$(AWS_ACCOUNT_ID)" \
+	--project-name "$(PROJECT_NAME)" \
+	--cloud-env "$(CLOUD_ENV)" \
+	--tf-workdir "$(TF_DEV_DIR)" \
+	--tf-var-file "terraform.tfvars" \
+	--image-tag "$(IMAGE_TAG)" \
+	--image-platform "$(IMAGE_PLATFORM)" \
+	--services "$(RELEASE_SERVICES)"
 
 help:
 	@echo "Available targets:"
@@ -81,9 +95,9 @@ help:
 	@echo "  test-perf Run API enqueue latency benchmark test"
 	@echo "  ecr-login-dev Authenticate Docker to dev ECR registry"
 	@echo "  image-build-dev Build API/worker/UI images for dev"
-	@echo "  image-push-dev Build and push API/worker/UI images to ECR"
+	@echo "  image-push-dev Build and push images to ECR (centralized)"
 	@echo "  deploy-plan-dev Terraform plan for dev using IMAGE_TAG"
-	@echo "  deploy-dev Build/push images and apply Terraform with IMAGE_TAG"
+	@echo "  deploy-dev Build/push/apply/wait/smoke (centralized)"
 	@echo "              Optional IMAGE_PLATFORM (default linux/amd64)"
 	@echo "  rotate-api-auth-key-dev Rotate deployed API auth key in cloud"
 	@echo "  tf-fmt    Format Terraform files"
@@ -148,28 +162,17 @@ ecr-login-dev:
 		--username AWS --password-stdin $(ECR_REGISTRY)
 
 image-build-dev:
-	docker build --platform $(IMAGE_PLATFORM) \
-		-f docker/api.Dockerfile -t $(API_ECR_IMAGE) .
-	docker build --platform $(IMAGE_PLATFORM) \
-		-f docker/worker.Dockerfile -t $(WORKER_ECR_IMAGE) .
-	docker build --platform $(IMAGE_PLATFORM) \
-		-f docker/ui.Dockerfile -t $(UI_ECR_IMAGE) .
+	$(RELEASE_CMD) build $(RELEASE_COMMON_ARGS)
 
-image-push-dev: ecr-login-dev image-build-dev
-	docker push $(API_ECR_IMAGE)
-	docker push $(WORKER_ECR_IMAGE)
-	docker push $(UI_ECR_IMAGE)
+image-push-dev:
+	$(RELEASE_CMD) build-push $(RELEASE_COMMON_ARGS)
 
 deploy-plan-dev:
-	terraform -chdir=$(TF_DEV_DIR) plan \
-		-var-file=terraform.tfvars \
-		-var="image_tag=$(IMAGE_TAG)"
+	$(RELEASE_CMD) plan $(RELEASE_COMMON_ARGS)
 
-deploy-dev: image-push-dev
-	terraform -chdir=$(TF_DEV_DIR) apply \
-		-var-file=terraform.tfvars \
-		-var="image_tag=$(IMAGE_TAG)" \
-		-auto-approve
+deploy-dev:
+	$(RELEASE_CMD) deploy $(RELEASE_COMMON_ARGS) \
+		--smoke-llm-mode "$(SMOKE_LLM_MODE)"
 
 rotate-api-auth-key-dev:
 	@bash scripts/rotate_api_auth_key_dev.sh
