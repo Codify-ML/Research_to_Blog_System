@@ -35,6 +35,15 @@ api_auth_enabled = false
 enable_nat_gateway = true
 waf_rate_limit = 2000
 
+# ECS resiliency and rolling deployment safety.
+api_desired_count = 2
+worker_desired_count = 2
+ui_desired_count = 2
+ui_logout_desired_count = 2
+deployment_minimum_healthy_percent = 100
+deployment_maximum_percent = 200
+enable_deployment_circuit_breaker = true
+
 # If left empty, Terraform composes image URIs from created ECR repos
 # using `image_tag`.
 api_image = ""

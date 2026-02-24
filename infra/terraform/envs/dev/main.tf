@@ -199,37 +199,48 @@ resource "aws_iam_role_policy" "task_execution_db_secret" {
 module "compute" {
   source = "../../modules/compute"
 
-  name_prefix                    = local.name_prefix
-  vpc_id                         = module.network.vpc_id
-  public_subnet_ids              = module.network.public_subnet_ids
-  private_subnet_ids             = module.network.private_subnet_ids
-  alb_api_sg_id                  = module.security.alb_api_sg_id
-  alb_ui_sg_id                   = module.security.alb_ui_sg_id
-  api_sg_id                      = module.security.api_sg_id
-  ui_sg_id                       = module.security.ui_sg_id
-  worker_sg_id                   = module.security.worker_sg_id
-  task_execution_role_arn        = module.security.task_execution_role_arn
-  task_role_arn                  = module.security.task_role_arn
-  db_endpoint                    = module.data.db_endpoint
-  db_port                        = module.data.db_port
-  db_name                        = var.db_name
-  db_username                    = var.db_username
-  db_password                    = var.db_password
-  db_secret_arn                  = module.data.db_master_secret_arn
-  redis_endpoint                 = module.data.redis_endpoint
-  redis_port                     = module.data.redis_port
-  openai_secret_arn              = module.secrets.openai_secret_arn
-  api_auth_secret_arn            = module.secrets.api_auth_secret_arn
-  api_image                      = var.api_image != "" ? var.api_image : "${module.ecr.api_repository_url}:${var.image_tag}"
-  worker_image                   = var.worker_image != "" ? var.worker_image : "${module.ecr.worker_repository_url}:${var.image_tag}"
-  ui_image                       = var.ui_image != "" ? var.ui_image : "${module.ecr.ui_repository_url}:${var.image_tag}"
-  api_base_url                   = var.enable_https ? "https://${local.effective_api_hostname}" : "http://${local.effective_api_hostname}"
-  api_auth_enabled               = var.api_auth_enabled
-  use_mock_llm                   = var.use_mock_llm
-  mock_mode_strict               = var.mock_mode_strict
-  openai_model_researcher        = var.openai_model_researcher
-  openai_model_writer            = var.openai_model_writer
-  openai_model_editor            = var.openai_model_editor
+  name_prefix             = local.name_prefix
+  vpc_id                  = module.network.vpc_id
+  public_subnet_ids       = module.network.public_subnet_ids
+  private_subnet_ids      = module.network.private_subnet_ids
+  alb_api_sg_id           = module.security.alb_api_sg_id
+  alb_ui_sg_id            = module.security.alb_ui_sg_id
+  api_sg_id               = module.security.api_sg_id
+  ui_sg_id                = module.security.ui_sg_id
+  worker_sg_id            = module.security.worker_sg_id
+  task_execution_role_arn = module.security.task_execution_role_arn
+  task_role_arn           = module.security.task_role_arn
+  db_endpoint             = module.data.db_endpoint
+  db_port                 = module.data.db_port
+  db_name                 = var.db_name
+  db_username             = var.db_username
+  db_password             = var.db_password
+  db_secret_arn           = module.data.db_master_secret_arn
+  redis_endpoint          = module.data.redis_endpoint
+  redis_port              = module.data.redis_port
+  openai_secret_arn       = module.secrets.openai_secret_arn
+  api_auth_secret_arn     = module.secrets.api_auth_secret_arn
+  api_image               = var.api_image != "" ? var.api_image : "${module.ecr.api_repository_url}:${var.image_tag}"
+  worker_image            = var.worker_image != "" ? var.worker_image : "${module.ecr.worker_repository_url}:${var.image_tag}"
+  ui_image                = var.ui_image != "" ? var.ui_image : "${module.ecr.ui_repository_url}:${var.image_tag}"
+  api_base_url            = var.enable_https ? "https://${local.effective_api_hostname}" : "http://${local.effective_api_hostname}"
+  api_auth_enabled        = var.api_auth_enabled
+  use_mock_llm            = var.use_mock_llm
+  mock_mode_strict        = var.mock_mode_strict
+  openai_model_researcher = var.openai_model_researcher
+  openai_model_writer     = var.openai_model_writer
+  openai_model_editor     = var.openai_model_editor
+  api_desired_count       = var.api_desired_count
+  worker_desired_count    = var.worker_desired_count
+  ui_desired_count        = var.ui_desired_count
+  ui_logout_desired_count = var.ui_logout_desired_count
+  deployment_minimum_healthy_percent = (
+    var.deployment_minimum_healthy_percent
+  )
+  deployment_maximum_percent = var.deployment_maximum_percent
+  enable_deployment_circuit_breaker = (
+    var.enable_deployment_circuit_breaker
+  )
   ui_cognito_hosted_ui_base      = "https://${aws_cognito_user_pool_domain.ui.domain}.auth.${var.aws_region}.amazoncognito.com"
   ui_public_base_url             = var.enable_https ? "https://${local.effective_ui_hostname}" : "http://${local.effective_ui_hostname}"
   enable_https                   = var.enable_https
