@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+.ruff_cache
+.run
+var
+dump.rdb
+*.db
+*.pyc
+initial_planning
+tests
+docs

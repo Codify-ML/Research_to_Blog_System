@@ -1,0 +1,47 @@
+# Copy to terraform.tfvars and update for your AWS account.
+# Never commit populated terraform.tfvars files.
+
+aws_region = "us-west-2"
+aws_profile = "personal-aws-dev"
+route53_zone_name = "dev.vc-projects-ds.com"
+route53_zone_id = "Z03707592Y0NKCCWRSSFL"
+app_dns_prefix = "vc-blog-agent"
+api_dns_label = "api"
+ui_dns_label = "ui"
+cognito_domain_prefix = "vc-blog-agent-dev-auth"
+enable_https = true
+enable_ui_auth = true
+
+# Optional full host overrides. Leave empty to use derived hostnames:
+#   <api_dns_label>.<app_dns_prefix>.<route53_zone_name>
+#   <ui_dns_label>.<app_dns_prefix>.<route53_zone_name>
+api_hostname = ""
+ui_hostname = ""
+
+# Deprecated/unused: RDS master password is now managed by AWS Secrets
+# Manager.
+# db_password = ""
+
+# Optional bootstrap values. If empty, Terraform creates the Secrets Manager
+# secret and you can set the value manually afterward.
+openai_api_key = ""
+api_auth_key = ""
+api_auth_enabled = false
+
+# If you set api_auth_enabled=true, also provide api_auth_key (or
+# TF_VAR_api_auth_key) before plan/apply.
+
+# Network posture for cloud portability.
+enable_nat_gateway = true
+waf_rate_limit = 2000
+
+# If left empty, Terraform composes image URIs from created ECR repos
+# using `image_tag`.
+api_image = ""
+worker_image = ""
+ui_image = ""
+image_tag = "latest"
+
+# Runtime defaults.
+use_mock_llm = false
+mock_mode_strict = false

@@ -1,0 +1,41 @@
+[project]
+name = "research-to-blog-system"
+version = "0.1.0"
+description = "Multi-agent research-to-blog system with API, UI, and cloud deployment tooling"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "celery>=5.4.0",
+  "fastapi>=0.115.0",
+  "kombu>=5.4.0",
+  "langgraph>=0.2.50",
+  "openai>=1.54.0",
+  "psycopg[binary]>=3.2.0",
+  "pydantic>=2.9.0",
+  "pydantic-settings>=2.4.0",
+  "redis>=5.0.0",
+  "requests>=2.32.0",
+  "streamlit>=1.40.0",
+  "typing-extensions>=4.12.2",
+  "uvicorn>=0.30.0",
+]
+
+[dependency-groups]
+dev = [
+  "black>=24.8.0",
+  "pytest>=8.3.0",
+  "ruff>=0.6.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.black]
+line-length = 79
+
+[tool.ruff]
+line-length = 79
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
