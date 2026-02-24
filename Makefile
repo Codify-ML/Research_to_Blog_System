@@ -63,14 +63,14 @@ TF_DEV_DIR := infra/terraform/envs/dev
 # Cloud release defaults
 AWS_PROFILE ?= personal-aws-dev
 AWS_REGION ?= us-west-2
-AWS_ACCOUNT_ID ?= 497458934978
+# Leave unset to resolve dynamically via AWS STS at runtime.
+AWS_ACCOUNT_ID ?=
 PROJECT_NAME ?= vc-blog-agent
 CLOUD_ENV ?= dev
 IMAGE_TAG ?= latest
 IMAGE_PLATFORM ?= linux/amd64
 RELEASE_SERVICES ?= api,worker,ui
 SMOKE_LLM_MODE ?= mock
-ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 RELEASE_CMD := uv run python scripts/release.py
 RELEASE_COMMON_ARGS := \
 	--aws-profile "$(AWS_PROFILE)" \
@@ -123,9 +123,13 @@ test-perf: ## Run enqueue latency performance test.
 
 ##@ Cloud Release
 ecr-login-dev: ## Authenticate Docker to the dev ECR registry.
-	@AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
+	@account_id="$${AWS_ACCOUNT_ID:-$$(AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
+		aws sts get-caller-identity --query Account --output text)}"; \
+	registry="$$account_id.dkr.ecr.$(AWS_REGION).amazonaws.com"; \
+	echo "Using ECR registry: $$registry"; \
+	AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
 		aws ecr get-login-password | docker login \
-		--username AWS --password-stdin $(ECR_REGISTRY)
+		--username AWS --password-stdin "$$registry"
 
 image-build-dev: ## Build API/worker/UI images for dev.
 	$(RELEASE_CMD) build $(RELEASE_COMMON_ARGS)
