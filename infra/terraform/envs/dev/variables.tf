@@ -248,6 +248,48 @@ variable "image_tag" {
   default     = "latest"
 }
 
+variable "api_desired_count" {
+  description = "Desired number of API tasks."
+  type        = number
+  default     = 2
+}
+
+variable "worker_desired_count" {
+  description = "Desired number of worker tasks."
+  type        = number
+  default     = 2
+}
+
+variable "ui_desired_count" {
+  description = "Desired number of UI tasks."
+  type        = number
+  default     = 2
+}
+
+variable "ui_logout_desired_count" {
+  description = "Desired number of UI logout tasks."
+  type        = number
+  default     = 2
+}
+
+variable "deployment_minimum_healthy_percent" {
+  description = "Minimum healthy tasks during ECS rolling deployments."
+  type        = number
+  default     = 100
+}
+
+variable "deployment_maximum_percent" {
+  description = "Maximum running tasks during ECS rolling deployments."
+  type        = number
+  default     = 200
+}
+
+variable "enable_deployment_circuit_breaker" {
+  description = "Enable ECS deployment circuit breaker with rollback."
+  type        = bool
+  default     = true
+}
+
 variable "use_mock_llm" {
   description = "Default API mode if llm_mode is not provided by caller."
   type        = bool

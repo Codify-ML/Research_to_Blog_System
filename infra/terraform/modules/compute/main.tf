@@ -443,11 +443,21 @@ resource "aws_ecs_task_definition" "ui_logout" {
 }
 
 resource "aws_ecs_service" "api" {
-  name            = "${var.name_prefix}-api"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.api.arn
-  desired_count   = var.api_desired_count
-  launch_type     = "FARGATE"
+  name                               = "${var.name_prefix}-api"
+  cluster                            = aws_ecs_cluster.this.id
+  task_definition                    = aws_ecs_task_definition.api.arn
+  desired_count                      = var.api_desired_count
+  launch_type                        = "FARGATE"
+  deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
+  deployment_maximum_percent         = var.deployment_maximum_percent
+
+  dynamic "deployment_circuit_breaker" {
+    for_each = var.enable_deployment_circuit_breaker ? [1] : []
+    content {
+      enable   = true
+      rollback = true
+    }
+  }
 
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -463,11 +473,21 @@ resource "aws_ecs_service" "api" {
 }
 
 resource "aws_ecs_service" "worker" {
-  name            = "${var.name_prefix}-worker"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.worker.arn
-  desired_count   = var.worker_desired_count
-  launch_type     = "FARGATE"
+  name                               = "${var.name_prefix}-worker"
+  cluster                            = aws_ecs_cluster.this.id
+  task_definition                    = aws_ecs_task_definition.worker.arn
+  desired_count                      = var.worker_desired_count
+  launch_type                        = "FARGATE"
+  deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
+  deployment_maximum_percent         = var.deployment_maximum_percent
+
+  dynamic "deployment_circuit_breaker" {
+    for_each = var.enable_deployment_circuit_breaker ? [1] : []
+    content {
+      enable   = true
+      rollback = true
+    }
+  }
 
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -477,11 +497,21 @@ resource "aws_ecs_service" "worker" {
 }
 
 resource "aws_ecs_service" "ui" {
-  name            = "${var.name_prefix}-ui"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.ui.arn
-  desired_count   = var.ui_desired_count
-  launch_type     = "FARGATE"
+  name                               = "${var.name_prefix}-ui"
+  cluster                            = aws_ecs_cluster.this.id
+  task_definition                    = aws_ecs_task_definition.ui.arn
+  desired_count                      = var.ui_desired_count
+  launch_type                        = "FARGATE"
+  deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
+  deployment_maximum_percent         = var.deployment_maximum_percent
+
+  dynamic "deployment_circuit_breaker" {
+    for_each = var.enable_deployment_circuit_breaker ? [1] : []
+    content {
+      enable   = true
+      rollback = true
+    }
+  }
 
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -497,11 +527,21 @@ resource "aws_ecs_service" "ui" {
 }
 
 resource "aws_ecs_service" "ui_logout" {
-  name            = "${var.name_prefix}-ui-logout"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.ui_logout.arn
-  desired_count   = var.ui_logout_desired_count
-  launch_type     = "FARGATE"
+  name                               = "${var.name_prefix}-ui-logout"
+  cluster                            = aws_ecs_cluster.this.id
+  task_definition                    = aws_ecs_task_definition.ui_logout.arn
+  desired_count                      = var.ui_logout_desired_count
+  launch_type                        = "FARGATE"
+  deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
+  deployment_maximum_percent         = var.deployment_maximum_percent
+
+  dynamic "deployment_circuit_breaker" {
+    for_each = var.enable_deployment_circuit_breaker ? [1] : []
+    content {
+      enable   = true
+      rollback = true
+    }
+  }
 
   network_configuration {
     subnets          = var.private_subnet_ids
