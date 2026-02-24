@@ -160,6 +160,11 @@ def _build_aws_env(config: ReleaseConfig) -> dict[str, str]:
 
 def _build_tf_env(config: ReleaseConfig) -> dict[str, str]:
     env = _build_aws_env(config)
+    if "TF_VAR_aws_profile" not in env:
+        # In CI this remains empty (OIDC creds), while local runs can pass
+        # a profile via --aws-profile / AWS_PROFILE.
+        env["TF_VAR_aws_profile"] = config.aws_profile
+
     if not env.get("TF_VAR_api_auth_key"):
         candidate = env.get("API_AUTH_KEY")
         if not candidate:
@@ -268,13 +273,23 @@ def _docker_push(config: ReleaseConfig) -> None:
 
 
 def _terraform(config: ReleaseConfig, command: str) -> None:
+    tf_var_path = Path(config.tf_workdir) / config.tf_var_file
     tf_cmd = [
         "terraform",
         f"-chdir={config.tf_workdir}",
         command,
-        f"-var-file={config.tf_var_file}",
         f"-var=image_tag={config.image_tag}",
     ]
+    if command in {"plan", "apply"}:
+        tf_cmd.append("-lock-timeout=5m")
+    if config.tf_var_file:
+        if tf_var_path.exists():
+            tf_cmd.insert(3, f"-var-file={config.tf_var_file}")
+        else:
+            print(
+                "note: skipping -var-file because it was not found: "
+                f"{tf_var_path}"
+            )
     if command == "apply" and config.auto_approve:
         tf_cmd.append("-auto-approve")
     _run(tf_cmd, env=_build_tf_env(config))

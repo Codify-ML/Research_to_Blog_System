@@ -43,6 +43,9 @@ on:
           - openai
   push:
     branches:
+      - "**"
+  pull_request:
+    branches:
       - main
     paths:
       - "apps/**"
@@ -59,12 +62,21 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: cloud-release-${{ vars.CLOUD_ENV || 'dev' }}
+  cancel-in-progress: false
+
 jobs:
   release:
+    if: >-
+      ${{
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+      }}
     runs-on: ubuntu-latest
     environment: >-
       ${{ github.event_name == 'workflow_dispatch' &&
-      inputs.environment || 'dev' }}
+      github.event.inputs.environment || 'dev' }}
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
@@ -72,6 +84,8 @@ jobs:
       CLOUD_ENV: ${{ vars.CLOUD_ENV }}
       TF_WORKDIR: ${{ vars.TF_WORKDIR }}
       IMAGE_PLATFORM: ${{ vars.IMAGE_PLATFORM }}
+      ENABLE_FEATURE_DEPLOY: ${{ vars.ENABLE_FEATURE_DEPLOY }}
+      FEATURE_DEPLOY_REF: ${{ vars.FEATURE_DEPLOY_REF }}
       API_AUTH_KEY: ${{ secrets.API_AUTH_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
@@ -91,19 +105,41 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            action="${{ inputs.action }}"
-            services="${{ inputs.services }}"
-            image_tag="${{ inputs.image_tag }}"
-            run_smoke="${{ inputs.run_smoke }}"
-            smoke_llm_mode="${{ inputs.smoke_llm_mode }}"
-            selected_environment="${{ inputs.environment }}"
-          else
-            action="build-push"
+            action="${{ github.event.inputs.action }}"
+            services="${{ github.event.inputs.services }}"
+            image_tag="${{ github.event.inputs.image_tag }}"
+            run_smoke="${{ github.event.inputs.run_smoke }}"
+            smoke_llm_mode="${{ github.event.inputs.smoke_llm_mode }}"
+            selected_environment="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            action="plan"
             services="api,worker,ui"
             image_tag="${GITHUB_SHA::12}"
             run_smoke="false"
             smoke_llm_mode="mock"
-            selected_environment="dev"
+            selected_environment="${CLOUD_ENV:-dev}"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            action="deploy"
+            services="api,worker,ui"
+            image_tag="${GITHUB_SHA::12}"
+            run_smoke="true"
+            smoke_llm_mode="mock"
+            selected_environment="${CLOUD_ENV:-dev}"
+          elif [ "${ENABLE_FEATURE_DEPLOY:-false}" = "true" ] && \
+               [ "${{ github.ref }}" = "${FEATURE_DEPLOY_REF:-}" ]; then
+            action="deploy"
+            services="api,worker,ui"
+            image_tag="${GITHUB_SHA::12}"
+            run_smoke="true"
+            smoke_llm_mode="mock"
+            selected_environment="${CLOUD_ENV:-dev}"
+          else
+            action="plan"
+            services="api,worker,ui"
+            image_tag="${GITHUB_SHA::12}"
+            run_smoke="false"
+            smoke_llm_mode="mock"
+            selected_environment="${CLOUD_ENV:-dev}"
           fi
 
           if [ -z "$services" ]; then
@@ -129,20 +165,55 @@ jobs:
             exit 1
           fi
 
-      - name: Configure AWS credentials (with external id)
-        if: ${{ secrets.AWS_ROLE_EXTERNAL_ID != '' }}
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           role-external-id: ${{ secrets.AWS_ROLE_EXTERNAL_ID }}
           aws-region: ${{ env.AWS_REGION || 'us-west-2' }}
 
-      - name: Configure AWS credentials
-        if: ${{ secrets.AWS_ROLE_EXTERNAL_ID == '' }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION || 'us-west-2' }}
+      - name: Build Docker images (PR/non-main validation)
+        if: >-
+          ${{
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'push' && github.ref != 'refs/heads/main')
+          }}
+        run: |
+          set -euo pipefail
+          cmd=(
+            python scripts/release.py "build"
+            --services "${{ steps.params.outputs.services }}"
+            --aws-region "${AWS_REGION:-}"
+            --aws-account-id "${AWS_ACCOUNT_ID:-}"
+            --project-name "${PROJECT_NAME:-}"
+            --cloud-env "${CLOUD_ENV:-}"
+            --tf-workdir "${TF_WORKDIR:-}"
+            --image-platform "${IMAGE_PLATFORM:-}"
+          )
+
+          if [ -n "${{ steps.params.outputs.image_tag }}" ]; then
+            cmd+=(--image-tag "${{ steps.params.outputs.image_tag }}")
+          fi
+
+          printf 'Running: %q ' "${cmd[@]}"
+          printf '\n'
+          "${cmd[@]}"
+
+      - name: Terraform init (remote backend)
+        if: >-
+          ${{
+          steps.params.outputs.action == 'plan' ||
+          steps.params.outputs.action == 'apply' ||
+          steps.params.outputs.action == 'deploy' ||
+          steps.params.outputs.action == 'smoke'
+          }}
+        run: |
+          set -euo pipefail
+          ci_backend_hcl="/tmp/tf-backend-ci.hcl"
+          grep -v '^profile[[:space:]]*=' \
+            "${TF_WORKDIR}/backend.hcl" > "${ci_backend_hcl}"
+          terraform -chdir="${TF_WORKDIR}" init -reconfigure \
+            -backend-config="${ci_backend_hcl}"
 
       - name: Run centralized release action
         run: |

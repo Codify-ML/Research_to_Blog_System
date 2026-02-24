@@ -111,6 +111,11 @@ GitHub Actions dynamic environment behavior:
 - It reads vars/secrets from that environment (`vars.*`, `secrets.*`).
 - Manual `workflow_dispatch` can run `build-push`, `plan`, `deploy`,
   or `smoke` via the same `scripts/release.py` entrypoint.
+- `pull_request` (targeting `main`) runs `build` + `plan`.
+- `push` on non-`main` branches runs `build` + `plan`.
+- `push` on `main` runs full `deploy` (build/push/apply/wait/smoke).
+- CI validation procedure:
+  `docs/ci_validation_runbook.md`.
 
 By default, release targets use:
 - `AWS_PROFILE=personal-aws-dev`
