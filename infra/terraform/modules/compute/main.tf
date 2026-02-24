@@ -1,5 +1,5 @@
 locals {
-  db_url = format(
+  legacy_db_url = format(
     "postgresql://%s:%s@%s:%d/%s",
     var.db_username,
     var.db_password,
@@ -16,7 +16,19 @@ locals {
     name      = "API_AUTH_KEY"
     valueFrom = var.api_auth_secret_arn
   }] : []
-  api_environment = [
+  db_password_secret = var.db_secret_arn != "" ? [{
+    name      = "DB_PASSWORD"
+    valueFrom = "${var.db_secret_arn}:password::"
+  }] : []
+  db_connection_environment = var.db_secret_arn != "" ? [
+    { name = "DB_HOST", value = var.db_endpoint },
+    { name = "DB_PORT", value = tostring(var.db_port) },
+    { name = "DB_NAME", value = var.db_name },
+    { name = "DB_USER", value = var.db_username },
+    ] : [
+    { name = "DATABASE_URL", value = local.legacy_db_url },
+  ]
+  api_environment = concat([
     { name = "USE_MOCK_LLM", value = tostring(var.use_mock_llm) },
     { name = "MOCK_MODE_STRICT", value = tostring(var.mock_mode_strict) },
     { name = "API_AUTH_ENABLED", value = tostring(var.api_auth_enabled) },
@@ -27,14 +39,13 @@ locals {
     { name = "OPENAI_MODEL_WRITER", value = var.openai_model_writer },
     { name = "OPENAI_MODEL_EDITOR", value = var.openai_model_editor },
     { name = "JOB_STORE_BACKEND", value = "postgres" },
-    { name = "DATABASE_URL", value = local.db_url },
     { name = "REDIS_URL", value = "${local.redis_base_url}/0" },
     { name = "CELERY_BROKER_URL", value = "${local.redis_base_url}/0" },
     {
       name  = "CELERY_RESULT_BACKEND"
       value = "${local.redis_base_url}/1"
     },
-  ]
+  ], local.db_connection_environment)
   worker_environment = local.api_environment
   ui_environment = [
     { name = "UI_API_BASE_URL", value = var.api_base_url },
@@ -307,7 +318,11 @@ resource "aws_ecs_task_definition" "api" {
         protocol      = "tcp"
       }]
       environment = local.api_environment
-      secrets     = concat(local.openai_secret, local.api_auth_secret)
+      secrets = concat(
+        local.openai_secret,
+        local.api_auth_secret,
+        local.db_password_secret,
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -335,7 +350,11 @@ resource "aws_ecs_task_definition" "worker" {
       image       = var.worker_image
       essential   = true
       environment = local.worker_environment
-      secrets     = concat(local.openai_secret, local.api_auth_secret)
+      secrets = concat(
+        local.openai_secret,
+        local.api_auth_secret,
+        local.db_password_secret,
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {

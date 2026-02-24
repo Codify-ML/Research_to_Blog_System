@@ -74,9 +74,15 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  description = "Postgres DB password."
+  description = "Deprecated fallback DB password used during migration."
   type        = string
+  default     = ""
   sensitive   = true
+}
+
+variable "db_secret_arn" {
+  description = "RDS secret ARN containing the DB password."
+  type        = string
 }
 
 variable "redis_endpoint" {

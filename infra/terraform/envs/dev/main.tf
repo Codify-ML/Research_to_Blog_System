@@ -116,10 +116,49 @@ module "data" {
   redis_sg_id          = module.security.redis_sg_id
   db_name              = var.db_name
   db_username          = var.db_username
-  db_password          = var.db_password
   db_instance_class    = var.db_instance_class
   db_allocated_storage = var.db_allocated_storage
   redis_node_type      = var.redis_node_type
+}
+
+resource "aws_iam_role_policy" "task_db_secret" {
+  count = module.data.db_master_secret_arn != "" ? 1 : 0
+
+  name = "${local.name_prefix}-db-secret-access"
+  role = module.security.task_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+        ]
+        Resource = module.data.db_master_secret_arn
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "task_execution_db_secret" {
+  count = module.data.db_master_secret_arn != "" ? 1 : 0
+
+  name = "${local.name_prefix}-db-secret-access-exec"
+  role = module.security.task_execution_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+        ]
+        Resource = module.data.db_master_secret_arn
+      },
+    ]
+  })
 }
 
 module "compute" {
@@ -141,6 +180,7 @@ module "compute" {
   db_name                        = var.db_name
   db_username                    = var.db_username
   db_password                    = var.db_password
+  db_secret_arn                  = module.data.db_master_secret_arn
   redis_endpoint                 = module.data.redis_endpoint
   redis_port                     = module.data.redis_port
   openai_secret_arn              = module.secrets.openai_secret_arn

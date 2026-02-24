@@ -46,9 +46,21 @@ No `apply` is run automatically. Review the plan first.
   control at the edge.
 - API shared-key auth can be enabled with `api_auth_enabled=true`.
   The API key is stored in Secrets Manager and injected into API/UI tasks.
+- RDS now uses AWS-managed master credentials
+  (`manage_master_user_password = true`), with the generated secret ARN
+  exposed as `db_master_secret_arn`.
 - A regional WAF is associated with both ALBs (managed rules + rate limit).
 - If `api_image`, `worker_image`, and `ui_image` are empty, Terraform
   composes image URIs from created ECR repositories and `image_tag`.
+
+## RDS Secret Migration Note
+
+For existing stacks that previously used plaintext `db_password`, run apply
+twice during migration:
+
+1. First apply enables `manage_master_user_password` on RDS.
+2. Second apply wires ECS DB secret injection and IAM access using the now
+   available RDS secret ARN.
 
 ## CI Image Pipeline
 

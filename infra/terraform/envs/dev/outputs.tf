@@ -23,6 +23,11 @@ output "api_auth_secret_arn" {
   value       = module.secrets.api_auth_secret_arn
 }
 
+output "db_master_secret_arn" {
+  description = "RDS-managed master user secret ARN in Secrets Manager."
+  value       = module.data.db_master_secret_arn
+}
+
 output "api_ecr_repository_url" {
   description = "API ECR repository URL."
   value       = module.ecr.api_repository_url

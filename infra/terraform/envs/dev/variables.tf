@@ -95,8 +95,9 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  description = "Postgres database password."
+  description = "Deprecated/unused. RDS now manages master password in Secrets Manager."
   type        = string
+  default     = ""
   sensitive   = true
 }
 
