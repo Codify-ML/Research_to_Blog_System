@@ -67,8 +67,25 @@ twice during migration:
 The workflow `.github/workflows/build-and-push-images.yml` builds and pushes
 API/worker/UI images to ECR (`<project>-<env>-{api,worker,ui}`).
 
-Required GitHub secret:
-- `AWS_ROLE_TO_ASSUME` for OIDC-based AWS auth.
+Required GitHub Environment variables:
+- `AWS_REGION`
+- `AWS_ACCOUNT_ID`
+- `PROJECT_NAME`
+- `CLOUD_ENV`
+- `TF_WORKDIR`
+- `IMAGE_PLATFORM`
+
+Optional GitHub Environment variables:
+- `ENABLE_FEATURE_DEPLOY`
+- `FEATURE_DEPLOY_REF`
+
+Required GitHub Environment secrets:
+- `AWS_ROLE_TO_ASSUME` (OIDC role)
+- `API_AUTH_KEY`
+- `OPENAI_API_KEY`
+
+Optional GitHub Environment secret:
+- `AWS_ROLE_EXTERNAL_ID`
 
 ## Authentication Operations
 

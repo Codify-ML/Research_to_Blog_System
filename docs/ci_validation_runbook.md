@@ -6,6 +6,8 @@ This runbook validates the branch behavior in
 ## Scope
 - `pull_request` to `main` runs `build` and then `plan`.
 - `push` to non-`main` branches runs `build` and then `plan`.
+- Optional feature-branch deploy override can run full `deploy` on a
+  specific non-`main` ref.
 - `push` to `main` runs full `deploy`:
   build/push/apply/wait/smoke.
 - Manual `workflow_dispatch` runs the selected action.
@@ -15,6 +17,8 @@ This runbook validates the branch behavior in
 - Environment variables are set:
   `AWS_REGION`, `AWS_ACCOUNT_ID`, `PROJECT_NAME`, `CLOUD_ENV`,
   `TF_WORKDIR`, `IMAGE_PLATFORM`.
+- Optional environment variables for feature deploy override:
+  `ENABLE_FEATURE_DEPLOY`, `FEATURE_DEPLOY_REF`.
 - Environment secrets are set:
   `AWS_ROLE_TO_ASSUME`, `API_AUTH_KEY`, `OPENAI_API_KEY`.
 - Optional secret:
@@ -24,6 +28,7 @@ This runbook validates the branch behavior in
 | Scenario | Trigger | Expected Action |
 |---|---|---|
 | Feature branch push | `push` (`refs/heads/feature/*`) | `build` + `plan` |
+| Feature deploy override | `push` where `ENABLE_FEATURE_DEPLOY=true` and `github.ref == FEATURE_DEPLOY_REF` | `deploy` |
 | PR to main | `pull_request` target `main` | `build` + `plan` |
 | Main merge/push | `push` (`refs/heads/main`) | `deploy` |
 | Manual run | `workflow_dispatch` | selected input action |
@@ -59,10 +64,21 @@ This runbook validates the branch behavior in
    - Run `plan`, then `smoke` (`mock` and `openai`).
    - Confirm behavior matches selected action.
 
+5. Feature deploy override validation (optional)
+   - In GitHub Environment vars, set:
+     `ENABLE_FEATURE_DEPLOY=true`
+     and `FEATURE_DEPLOY_REF=refs/heads/<branch>`.
+   - Push to that branch.
+   - Confirm `Resolve release parameters` emits `action=deploy`.
+   - Confirm logs include build/push/apply/wait/smoke.
+   - Disable override after validation
+     (`ENABLE_FEATURE_DEPLOY=false`).
+
 ## Acceptance Criteria
 - No PR run performs apply.
 - PR/non-main runs perform Docker build validation.
-- No non-main push performs deploy.
+- Non-main pushes only perform deploy when explicit feature override is
+  enabled and ref-matched.
 - Main push performs deploy and smoke.
 - Manual action selection behaves exactly as requested.
 

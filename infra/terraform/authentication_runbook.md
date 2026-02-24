@@ -60,8 +60,12 @@ aws cognito-idp admin-set-user-password \
   --user-pool-id <POOL_ID> \
   --username user@example.com \
   --password '<StrongTempPassword123!>' \
-  --permanent false
+  --no-permanent
 ```
+
+Notes:
+- Use `--no-permanent` to force the user to set a new password at next login.
+- Use `--permanent` only when you do not want a forced password change.
 
 ### Disable User
 

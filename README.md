@@ -1,7 +1,7 @@
 # Research to Blog System
 
-Phase 1, Phase 2, and Phase 3 scaffold for a multi-agent content
-pipeline.
+Multi-agent research-to-blog pipeline with local runtime, Docker parity,
+pre-cloud API gate checks, and Terraform/ECS deployment automation.
 
 ## Phase 1 Scope
 - LangGraph core workflow (Researcher -> Writer -> Editor -> Escalation)
@@ -80,7 +80,10 @@ make tf-init-dev
 make tf-validate-dev
 make tf-plan-dev
 ```
-No Terraform apply is executed automatically.
+No Terraform apply is executed by the `tf-init-dev` / `tf-validate-dev` /
+`tf-plan-dev` commands.
+These `tf-*` commands only initialize/validate/plan unless you run
+`make tf-apply-dev` explicitly.
 Current dev scaffold behavior:
 - S3 backend uses lockfile-based state locking.
 - ECS services are placed in private subnets (no public task IPs).
@@ -177,4 +180,5 @@ Researcher tool controls:
 
 ## Architecture Reference
 - Architecture planning notes are maintained in the local
-  `initial_planning/` workspace during planning phases.
+  `initial_planning/` workspace during planning phases. That workspace is
+  local-only and intentionally not committed to this repository.
