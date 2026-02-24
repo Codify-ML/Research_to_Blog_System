@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     api_auth_key: str | None = None
     research_web_search_enabled: bool = True
     research_function_tools_enabled: bool = True
+    safety_enabled: bool = True
+    safety_fail_closed: bool = False
+    safety_profanity_enabled: bool = True
+    safety_openai_moderation_enabled: bool = True
+    safety_openai_moderation_model: str = "omni-moderation-latest"
 
     redis_url: str = "redis://localhost:6379/0"
     database_url: str | None = None

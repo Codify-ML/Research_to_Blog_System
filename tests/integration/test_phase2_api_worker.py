@@ -30,6 +30,17 @@ def test_generate_invalid_payload_returns_422(client):
     assert response.json()["code"] == "VALIDATION_ERROR"
 
 
+def test_generate_policy_blocked_input_returns_422(client):
+    response = client.post(
+        "/generate",
+        json={"topic": "Write a fucking post with slurs."},
+    )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    payload = response.json()
+    assert payload["code"] == "POLICY_BLOCKED_INPUT"
+    assert "SAFETY_PROFANITY" in payload["message"]
+
+
 def test_status_unknown_job_returns_404(client):
     response = client.get("/status/does-not-exist")
     assert response.status_code == status.HTTP_404_NOT_FOUND
@@ -178,3 +189,69 @@ def test_unexpected_server_error_returns_500_contract(client, monkeypatch):
     assert payload["code"] == "INTERNAL_ERROR"
     assert payload["error_id"]
     assert payload["timestamp"]
+
+
+def test_worker_escalates_unsafe_output(client, monkeypatch):
+    monkeypatch.setattr(
+        "apps.api.app.main.enqueue_generate_job",
+        lambda _job_id: "task-unsafe-output",
+    )
+    created = client.post(
+        "/generate",
+        json={"topic": "guardrails test topic"},
+    )
+    job_id = created.json()["job_id"]
+
+    class FakeApp:
+        def invoke(self, *_args, **_kwargs):
+            return {
+                "job_id": job_id,
+                "topic": "guardrails test topic",
+                "research_notes": ["note"],
+                "draft": "This draft is fucking unsafe.",
+                "editor_feedback": ["Looks good."],
+                "is_approved": True,
+                "revision_count": 1,
+                "status": "COMPLETED",
+                "error_message": None,
+            }
+
+    monkeypatch.setattr(
+        "apps.worker.app.tasks.create_workflow",
+        lambda **_kwargs: FakeApp(),
+    )
+
+    process_job(job_id)
+
+    status_resp = client.get(f"/status/{job_id}")
+    payload = status_resp.json()
+    assert payload["status"] == "ESCALATED"
+    assert payload["draft"] == ""
+    assert payload["error_message"] is not None
+    assert "SAFETY_PROFANITY" in payload["error_message"]
+
+
+def test_generate_safety_fail_closed_without_key_returns_503(
+    client, monkeypatch
+):
+    from packages.core.job_store import get_job_store
+    from packages.core.settings import get_settings
+
+    monkeypatch.setenv("SAFETY_OPENAI_MODERATION_ENABLED", "true")
+    monkeypatch.setenv("SAFETY_FAIL_CLOSED", "true")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setattr(
+        "apps.api.app.main.enqueue_generate_job",
+        lambda _job_id: "task-safety-fail-closed",
+    )
+    get_settings.cache_clear()
+    get_job_store.cache_clear()
+
+    response = client.post(
+        "/generate",
+        json={"topic": "Discuss harmless planning topic"},
+    )
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    payload = response.json()
+    assert payload["code"] == "SAFETY_UNAVAILABLE"

@@ -26,3 +26,21 @@ def test_signout_url_is_constructed(monkeypatch):
 
     sign_out_url = ui_app._build_signout_url()
     assert sign_out_url == "https://ui.example.com/auth/logout"
+
+
+def test_classify_ui_error_for_policy_block():
+    level, message = ui_app._classify_ui_error(
+        error_message="Input blocked by safety policy: SAFETY_PROFANITY.",
+        error_code="POLICY_BLOCKED_INPUT",
+    )
+    assert level == "warning"
+    assert "blocked by safety policy" in message.lower()
+
+
+def test_classify_ui_error_for_safety_unavailable():
+    level, message = ui_app._classify_ui_error(
+        error_message="Safety checks unavailable.",
+        error_code="SAFETY_UNAVAILABLE",
+    )
+    assert level == "error"
+    assert "temporarily unavailable" in message.lower()

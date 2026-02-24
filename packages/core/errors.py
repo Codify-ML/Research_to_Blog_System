@@ -4,3 +4,7 @@ class QueueUnavailableError(RuntimeError):
 
 class JobNotFoundError(KeyError):
     """Raised when a job_id does not exist in the job store."""
+
+
+class SafetyUnavailableError(RuntimeError):
+    """Raised when safety checks cannot complete in fail-closed mode."""

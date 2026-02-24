@@ -5,7 +5,9 @@ import time
 
 from apps.worker.app.celery_app import celery_app
 from packages.core.constants import AgentStatus, LLMMode
+from packages.core.errors import SafetyUnavailableError
 from packages.core.job_store import get_job_store
+from packages.core.safety import SafetyService
 from packages.core.settings import Settings, get_settings
 from packages.graph.agent_factory import build_agent_functions
 from packages.graph.workflow import create_workflow
@@ -22,6 +24,7 @@ def generate_blog_task(job_id: str) -> dict[str, str]:
 def process_job(job_id: str) -> dict[str, str]:
     store = get_job_store()
     base_settings = get_settings()
+    safety = SafetyService(base_settings)
 
     record = store.get_job_or_raise(job_id)
     store.set_status(job_id=job_id, next_status=AgentStatus.RUNNING)
@@ -90,6 +93,35 @@ def process_job(job_id: str) -> dict[str, str]:
         raise RuntimeError("Workflow returned non-dict state.")
 
     final_status = AgentStatus(result["status"])
+    if final_status == AgentStatus.COMPLETED:
+        try:
+            output_decision = safety.classify_output(
+                str(result.get("draft", ""))
+            )
+        except SafetyUnavailableError:
+            output_decision = None
+            final_status = AgentStatus.ESCALATED
+            result["status"] = final_status
+            result["error_message"] = (
+                "Output blocked: safety moderation service unavailable."
+            )
+            result["draft"] = ""
+        else:
+            if output_decision.blocked:
+                final_status = AgentStatus.ESCALATED
+                result["status"] = final_status
+                result["error_message"] = output_decision.message
+                result["draft"] = ""
+
+        if final_status == AgentStatus.ESCALATED:
+            result["is_approved"] = False
+            feedback = list(result.get("editor_feedback", []))
+            feedback.append(
+                "Draft was escalated by safety guardrails "
+                "and withheld from output."
+            )
+            result["editor_feedback"] = feedback
+
     store.set_status(job_id=job_id, next_status=final_status)
 
     updates = {key: value for key, value in result.items() if key != "status"}

@@ -16,8 +16,13 @@ from apps.api.app.schemas import (
     StatusResponse,
 )
 from packages.core.constants import AgentStatus, LLMMode
-from packages.core.errors import JobNotFoundError, QueueUnavailableError
+from packages.core.errors import (
+    JobNotFoundError,
+    QueueUnavailableError,
+    SafetyUnavailableError,
+)
 from packages.core.job_store import get_job_store
+from packages.core.safety import SafetyService
 from packages.core.settings import get_settings
 from packages.graph.workflow import initial_state
 
@@ -41,6 +46,18 @@ def _enforce_api_auth(
             message="Valid API key is required.",
         ).model_dump()
         raise HTTPException(status_code=401, detail=detail)
+
+
+def _safety_input_text(request: GenerateRequest) -> str:
+    return "\n".join(
+        part
+        for part in (
+            request.topic,
+            request.content_context,
+            request.content_format,
+        )
+        if part
+    )
 
 
 def create_app() -> FastAPI:
@@ -102,6 +119,7 @@ def create_app() -> FastAPI:
         _enforce_api_auth(provided_api_key=x_api_key)
         store = get_job_store()
         settings = get_settings()
+        safety = SafetyService(settings)
 
         selected_mode = request.llm_mode
         if selected_mode is None:
@@ -125,6 +143,24 @@ def create_app() -> FastAPI:
                 message=(
                     "OPENAI mode is disabled while MOCK_MODE_STRICT is true."
                 ),
+            ).model_dump()
+            raise HTTPException(status_code=422, detail=detail)
+
+        try:
+            input_decision = safety.classify_input(
+                _safety_input_text(request)
+            )
+        except SafetyUnavailableError as exc:
+            detail = ApiErrorResponse(
+                code="SAFETY_UNAVAILABLE",
+                message="Safety checks are unavailable. Please retry later.",
+            ).model_dump()
+            raise HTTPException(status_code=503, detail=detail) from exc
+
+        if input_decision.blocked:
+            detail = ApiErrorResponse(
+                code="POLICY_BLOCKED_INPUT",
+                message=input_decision.message,
             ).model_dump()
             raise HTTPException(status_code=422, detail=detail)
 
