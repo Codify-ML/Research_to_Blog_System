@@ -33,7 +33,7 @@ variable "route53_zone_id" {
 variable "app_dns_prefix" {
   description = "Shared DNS prefix for API/UI hostnames under route53_zone_name."
   type        = string
-  default     = "vc-blog-agent"
+  default     = "blog-agent"
 
   validation {
     condition = (
