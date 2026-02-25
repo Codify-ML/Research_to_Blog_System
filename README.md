@@ -52,6 +52,7 @@ flowchart LR
 - Streamlit UI for submissions, status tracking, and copy-friendly outputs.
 - Optional OpenAI execution mode plus mock mode for fast test loops.
 - Docker Compose stack with Redis and Postgres for local parity.
+- Optional separate Langfuse observability stack for tracing agent behavior.
 - Terraform-based AWS deployment (ECS/Fargate, ALB, Route53, ACM, Cognito,
   WAF, Secrets Manager, RDS, ElastiCache, ECR).
 - CI workflow for build/plan on PRs and controlled deploy workflows.
@@ -106,8 +107,12 @@ make docker-ps
 make docker-smoke
 make docker-smoke-db
 make docker-smoke-openai
+make obs-up
+make obs-ps
+make obs-smoke
 make test-gate
 make docker-down
+make obs-down
 ```
 
 Notes:
@@ -115,6 +120,10 @@ Notes:
 - `make docker-smoke-db`: validates persisted `jobs` row/state in Postgres.
 - `make docker-smoke-openai`: validates end-to-end OpenAI mode in containers.
 - `make test-gate`: runs strict API readiness checks and enqueue latency tests.
+- `make obs-up`: starts a separate Langfuse stack from
+  `docker-compose.observability.yml` (requires `.env.observability`).
+  `LANGFUSE_ENCRYPTION_KEY` must be 64 hex chars
+  (e.g. `openssl rand -hex 32`).
 
 ## LLM Modes and Research Controls
 Global runtime modes:
@@ -123,6 +132,14 @@ Global runtime modes:
 
 Optional safety lock:
 - `MOCK_MODE_STRICT=true` forces mock-only behavior.
+
+Observability:
+- `LANGFUSE_ENABLED=true`
+- `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`
+- `LANGFUSE_HOST` (for Dockerized app stack, use
+  `http://host.docker.internal:3000` by default)
+- `LANGFUSE_ENVIRONMENT`, `LANGFUSE_SAMPLE_RATE`,
+  `LANGFUSE_CAPTURE_CONTENT`, `LANGFUSE_TRACE_HEALTH_ENDPOINTS`
 
 Researcher controls:
 - `RESEARCH_WEB_SEARCH_ENABLED=true`

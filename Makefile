@@ -25,6 +25,11 @@
 	docker-down \
 	docker-logs \
 	docker-ps \
+	obs-up \
+	obs-down \
+	obs-logs \
+	obs-ps \
+	obs-smoke \
 	docker-smoke \
 	docker-smoke-db \
 	docker-smoke-openai \
@@ -58,6 +63,10 @@ WORKER_CMD_PATTERN := celery -A apps.worker.app.celery_app:celery_app worker -l 
 UI_CMD_PATTERN := streamlit run apps/ui/app.py --server.address 127.0.0.1 --server.port $(UI_PORT) --browser.gatherUsageStats false --server.headless true
 DOCKER_COMPOSE_FILE := docker-compose.local.yml
 DOCKER_COMPOSE := docker compose -f $(DOCKER_COMPOSE_FILE)
+OBS_COMPOSE_FILE := docker-compose.observability.yml
+OBS_ENV_FILE := .env.observability
+OBS_PROJECT_NAME ?= research_to_blog_system_obs
+OBS_DOCKER_COMPOSE := COMPOSE_PROJECT_NAME=$(OBS_PROJECT_NAME) docker compose --env-file $(OBS_ENV_FILE) -f $(OBS_COMPOSE_FILE)
 TF_DEV_DIR := infra/terraform/envs/dev
 
 # Cloud release defaults
@@ -178,6 +187,27 @@ docker-logs: ## Tail local Docker stack logs.
 
 docker-ps: ## List local Docker stack service status.
 	$(DOCKER_COMPOSE) ps
+
+obs-up: ## Start separate Langfuse observability stack.
+	@if [ ! -f $(OBS_ENV_FILE) ]; then \
+		echo "Missing $(OBS_ENV_FILE)."; \
+		echo "Create it from .env.observability.example first."; \
+		exit 1; \
+	fi
+	$(OBS_DOCKER_COMPOSE) up -d
+
+obs-down: ## Stop separate Langfuse observability stack.
+	$(OBS_DOCKER_COMPOSE) down --remove-orphans
+
+obs-logs: ## Tail Langfuse observability stack logs.
+	$(OBS_DOCKER_COMPOSE) logs -f --tail=200
+
+obs-ps: ## List Langfuse observability stack service status.
+	$(OBS_DOCKER_COMPOSE) ps
+
+obs-smoke: ## Quick smoke check for local Langfuse web endpoint.
+	@curl -fsS http://127.0.0.1:3000 >/dev/null && \
+		echo "Langfuse web is reachable at http://127.0.0.1:3000"
 
 docker-smoke: ## Run API lifecycle smoke test against Docker stack.
 	@$(DOCKER_COMPOSE) exec -T api /bin/sh -lc '\
