@@ -85,3 +85,4 @@ class ApiErrorResponse(BaseModel):
     retry_after_seconds: int | None = None
     blocked_category: str | None = None
     reason_codes: list[str] | None = None
+    safety_signals: list[str] | None = None

@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     safety_prompt_injection_enabled: bool = True
     safety_sensitive_data_enabled: bool = True
     safety_openai_moderation_enabled: bool = True
+    safety_explain_enabled: bool = True
     safety_openai_moderation_model: str = "omni-moderation-latest"
     safety_moderation_score_threshold: float = Field(
         default=0.65,

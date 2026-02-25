@@ -41,6 +41,11 @@ def test_generate_policy_blocked_input_returns_422(client):
     assert "SAFETY_PROFANITY" in payload["message"]
     assert payload["blocked_category"] == "profanity"
     assert payload["reason_codes"] == ["SAFETY_PROFANITY"]
+    assert payload["safety_signals"]
+    assert any(
+        signal.startswith("profanity:")
+        for signal in payload["safety_signals"]
+    )
 
 
 def test_generate_hate_content_input_returns_422(client):
@@ -54,6 +59,11 @@ def test_generate_hate_content_input_returns_422(client):
     assert "SAFETY_HATE_CONTENT" in payload["message"]
     assert payload["blocked_category"] == "hate_content"
     assert payload["reason_codes"] == ["SAFETY_HATE_CONTENT"]
+    assert payload["safety_signals"]
+    assert any(
+        signal.startswith("hate:")
+        for signal in payload["safety_signals"]
+    )
 
 
 def test_generate_prompt_injection_input_returns_422(client):

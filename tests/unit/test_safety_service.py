@@ -20,6 +20,10 @@ def test_profanity_prefilter_blocks_input() -> None:
 
     assert decision.blocked is True
     assert "SAFETY_PROFANITY" in decision.reason_codes
+    assert any(
+        signal.startswith("profanity:")
+        for signal in decision.signals
+    )
 
 
 def test_hate_prefilter_blocks_racism_content() -> None:
@@ -104,6 +108,22 @@ def test_clean_text_allows_when_moderation_disabled() -> None:
 
     assert decision.blocked is False
     assert decision.reason_codes == []
+
+
+def test_market_query_not_flagged_as_profanity() -> None:
+    settings = Settings(
+        use_mock_llm=True,
+        safety_openai_moderation_enabled=False,
+    )
+    service = SafetyService(settings)
+
+    decision = service.classify_input(
+        "Intuit's Stock performance in the last 2 months"
+    )
+
+    assert decision.blocked is False
+    assert decision.reason_codes == []
+    assert decision.signals == []
 
 
 @dataclass(slots=True)

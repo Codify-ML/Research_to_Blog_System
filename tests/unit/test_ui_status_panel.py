@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from apps.ui.api_client import StatusResult
 from apps.ui.components.status_panel import (
+    _extract_citation_rows,
     is_terminal_status,
     status_level,
     terminal_message,
@@ -61,3 +62,47 @@ def test_terminal_message_uses_error_message_when_present():
 def test_terminal_message_defaults_for_escalation():
     payload = _status_payload(status="ESCALATED")
     assert "exceeding revision threshold" in terminal_message(payload)
+
+
+def test_extract_citation_rows_reads_structured_source_blocks():
+    payload = StatusResult(
+        **{
+            **_status_payload(status="RUNNING").__dict__,
+            "research_notes": [
+                (
+                    "Revenue rose 12%. "
+                    "[source: sec.gov; url: https://sec.gov/x; "
+                    "date: 2026-02-25]"
+                )
+            ],
+        }
+    )
+
+    rows = _extract_citation_rows(payload)
+
+    assert rows == [
+        {
+            "Source": "sec.gov",
+            "URL": "https://sec.gov/x",
+            "Date": "2026-02-25",
+        }
+    ]
+
+
+def test_extract_citation_rows_falls_back_to_url_scan():
+    payload = StatusResult(
+        **{
+            **_status_payload(status="RUNNING").__dict__,
+            "research_notes": ["See https://example.com/report for details."],
+        }
+    )
+
+    rows = _extract_citation_rows(payload)
+
+    assert rows == [
+        {
+            "Source": "example.com",
+            "URL": "https://example.com/report",
+            "Date": "unknown",
+        }
+    ]
