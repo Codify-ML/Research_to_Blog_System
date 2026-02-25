@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import quote_plus
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,8 +28,16 @@ class Settings(BaseSettings):
     safety_enabled: bool = True
     safety_fail_closed: bool = False
     safety_profanity_enabled: bool = True
+    safety_hate_content_enabled: bool = True
+    safety_prompt_injection_enabled: bool = True
+    safety_sensitive_data_enabled: bool = True
     safety_openai_moderation_enabled: bool = True
     safety_openai_moderation_model: str = "omni-moderation-latest"
+    safety_moderation_score_threshold: float = Field(
+        default=0.65,
+        ge=0.0,
+        le=1.0,
+    )
 
     redis_url: str = "redis://localhost:6379/0"
     database_url: str | None = None
