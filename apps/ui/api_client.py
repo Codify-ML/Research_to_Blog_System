@@ -15,10 +15,16 @@ class ApiClientError(RuntimeError):
         *,
         status_code: int | None = None,
         error_code: str | None = None,
+        retry_after_seconds: int | None = None,
+        blocked_category: str | None = None,
+        reason_codes: list[str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.error_code = error_code
+        self.retry_after_seconds = retry_after_seconds
+        self.blocked_category = blocked_category
+        self.reason_codes = reason_codes
 
 
 @dataclass(frozen=True)
@@ -173,6 +179,15 @@ class ApiClient:
             detail = {}
 
         error_code = detail.get("code")
+        retry_after_seconds = detail.get("retry_after_seconds")
+        blocked_category = detail.get("blocked_category")
+        raw_reason_codes = detail.get("reason_codes")
+        reason_codes: list[str] | None = None
+        if (
+            isinstance(raw_reason_codes, list)
+            and all(isinstance(item, str) for item in raw_reason_codes)
+        ):
+            reason_codes = [str(item) for item in raw_reason_codes]
         message = (
             detail.get("message") or response.text or "API request failed."
         )
@@ -180,4 +195,15 @@ class ApiClient:
             message,
             status_code=response.status_code,
             error_code=(str(error_code) if error_code is not None else None),
+            retry_after_seconds=(
+                int(retry_after_seconds)
+                if isinstance(retry_after_seconds, int)
+                else None
+            ),
+            blocked_category=(
+                str(blocked_category)
+                if isinstance(blocked_category, str)
+                else None
+            ),
+            reason_codes=reason_codes,
         )

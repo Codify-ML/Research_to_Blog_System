@@ -172,7 +172,49 @@ def test_api_error_raises_contract_aware_exception():
     exc = exc_info.value
     assert exc.status_code == 503
     assert exc.error_code == "QUEUE_UNAVAILABLE"
+    assert exc.retry_after_seconds is None
+    assert exc.blocked_category is None
+    assert exc.reason_codes is None
     assert "Queue is unavailable" in str(exc)
+
+
+def test_api_error_maps_policy_block_metadata():
+    session = _Session(
+        response=_Response(
+            status_code=422,
+            payload={
+                "detail": {
+                    "code": "POLICY_BLOCKED_INPUT",
+                    "message": "Input blocked by safety policy.",
+                    "blocked_category": "hate_content",
+                    "reason_codes": ["SAFETY_HATE_CONTENT"],
+                }
+            },
+        )
+    )
+    client = ApiClient(
+        base_url="http://127.0.0.1:8000",
+        timeout_seconds=5.0,
+        session=session,
+    )
+
+    with pytest.raises(ApiClientError) as exc_info:
+        client.generate(
+            topic="bad topic",
+            llm_mode="mock",
+            max_sources=6,
+            content_format="Blog article",
+            content_context="",
+            tone="professional",
+            length_preference="balanced",
+            research_depth="standard",
+        )
+
+    exc = exc_info.value
+    assert exc.status_code == 422
+    assert exc.error_code == "POLICY_BLOCKED_INPUT"
+    assert exc.blocked_category == "hate_content"
+    assert exc.reason_codes == ["SAFETY_HATE_CONTENT"]
 
 
 def test_transport_error_is_wrapped():

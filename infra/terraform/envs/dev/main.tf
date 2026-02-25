@@ -230,6 +230,15 @@ module "compute" {
   openai_model_researcher = var.openai_model_researcher
   openai_model_writer     = var.openai_model_writer
   openai_model_editor     = var.openai_model_editor
+  rate_limit_enabled      = var.rate_limit_enabled
+  rate_limit_generate_per_minute = (
+    var.rate_limit_generate_per_minute
+  )
+  rate_limit_status_per_minute = var.rate_limit_status_per_minute
+  abuse_window_seconds         = var.abuse_window_seconds
+  abuse_violation_threshold    = var.abuse_violation_threshold
+  abuse_cooldown_seconds       = var.abuse_cooldown_seconds
+  rate_limit_fail_open         = var.rate_limit_fail_open
   api_desired_count       = var.api_desired_count
   worker_desired_count    = var.worker_desired_count
   ui_desired_count        = var.ui_desired_count

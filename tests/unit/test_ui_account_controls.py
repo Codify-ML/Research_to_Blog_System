@@ -37,6 +37,18 @@ def test_classify_ui_error_for_policy_block():
     assert "blocked by safety policy" in message.lower()
 
 
+def test_classify_ui_error_for_policy_block_hate_category():
+    level, message = ui_app._classify_ui_error(
+        error_message="Input blocked by safety policy: SAFETY_HATE_CONTENT.",
+        error_code="POLICY_BLOCKED_INPUT",
+        blocked_category="hate_content",
+        reason_codes=["SAFETY_HATE_CONTENT"],
+    )
+    assert level == "warning"
+    assert "discriminatory" in message.lower()
+    assert "SAFETY_HATE_CONTENT" in message
+
+
 def test_classify_ui_error_for_safety_unavailable():
     level, message = ui_app._classify_ui_error(
         error_message="Safety checks unavailable.",

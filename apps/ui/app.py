@@ -61,12 +61,46 @@ def _classify_ui_error(
     *,
     error_message: str,
     error_code: str | None,
+    blocked_category: str | None = None,
+    reason_codes: list[str] | None = None,
 ) -> tuple[str, str]:
     if error_code == "POLICY_BLOCKED_INPUT":
+        category_guidance = {
+            "profanity": (
+                "Input includes profanity or abusive language. "
+                "Use neutral, professional wording."
+            ),
+            "hate_content": (
+                "Input includes hateful or discriminatory language. "
+                "Use respectful, non-discriminatory wording."
+            ),
+            "prompt_injection": (
+                "Input looks like an instruction-bypass attempt. "
+                "Focus on the blog topic only."
+            ),
+            "sensitive_data": (
+                "Input appears to include sensitive data (keys/passwords). "
+                "Remove secrets and personal data."
+            ),
+            "moderation": (
+                "Input triggered moderation safeguards. "
+                "Revise the prompt to be safer and more neutral."
+            ),
+        }
+        category_text = category_guidance.get(
+            (blocked_category or "").lower(),
+            "Request blocked by safety policy.",
+        )
+        reasons_text = ""
+        if reason_codes:
+            reasons_text = (
+                "\n\nSignals: " + ", ".join(sorted(set(reason_codes)))
+            )
         return (
             "warning",
-            "Request blocked by safety policy. "
-            "Please revise your prompt and try again.\n\n"
+            f"{category_text}\n\n"
+            "Please revise your prompt and try again."
+            f"{reasons_text}\n\n"
             f"Details: {error_message}",
         )
     if error_code == "SAFETY_UNAVAILABLE":
@@ -157,6 +191,8 @@ def _fetch_status(client: ApiClient, job_id: str):
         st.session_state["ui_error"] = {
             "message": str(exc),
             "code": exc.error_code,
+            "blocked_category": exc.blocked_category,
+            "reason_codes": exc.reason_codes,
         }
         return None
 
@@ -302,6 +338,8 @@ def main() -> None:
                 st.session_state["ui_error"] = {
                     "message": str(exc),
                     "code": exc.error_code,
+                    "blocked_category": exc.blocked_category,
+                    "reason_codes": exc.reason_codes,
                 }
 
     job_id = st.session_state["active_job_id"]
@@ -315,6 +353,19 @@ def main() -> None:
                 error_code=(
                     str(ui_error["code"])
                     if ui_error.get("code") is not None
+                    else None
+                ),
+                blocked_category=(
+                    str(ui_error["blocked_category"])
+                    if ui_error.get("blocked_category") is not None
+                    else None
+                ),
+                reason_codes=(
+                    [
+                        str(item)
+                        for item in ui_error["reason_codes"]
+                    ]
+                    if isinstance(ui_error.get("reason_codes"), list)
                     else None
                 ),
             )

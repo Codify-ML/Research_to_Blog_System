@@ -82,3 +82,6 @@ class ApiErrorResponse(BaseModel):
     message: str
     error_id: str | None = None
     timestamp: str | None = None
+    retry_after_seconds: int | None = None
+    blocked_category: str | None = None
+    reason_codes: list[str] | None = None
