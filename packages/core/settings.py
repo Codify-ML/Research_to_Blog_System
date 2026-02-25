@@ -38,6 +38,13 @@ class Settings(BaseSettings):
         ge=0.0,
         le=1.0,
     )
+    rate_limit_enabled: bool = True
+    rate_limit_generate_per_minute: int = Field(default=20, ge=1)
+    rate_limit_status_per_minute: int = Field(default=120, ge=1)
+    abuse_window_seconds: int = Field(default=600, ge=1)
+    abuse_violation_threshold: int = Field(default=5, ge=1)
+    abuse_cooldown_seconds: int = Field(default=900, ge=1)
+    rate_limit_fail_open: bool = True
 
     redis_url: str = "redis://localhost:6379/0"
     database_url: str | None = None

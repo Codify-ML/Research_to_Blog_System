@@ -319,3 +319,45 @@ variable "openai_model_editor" {
   type        = string
   default     = "gpt-4.1-mini"
 }
+
+variable "rate_limit_enabled" {
+  description = "Enable API rate-limiting controls."
+  type        = bool
+  default     = true
+}
+
+variable "rate_limit_generate_per_minute" {
+  description = "Per-identity generate request limit per minute."
+  type        = number
+  default     = 20
+}
+
+variable "rate_limit_status_per_minute" {
+  description = "Per-identity status request limit per minute."
+  type        = number
+  default     = 120
+}
+
+variable "abuse_window_seconds" {
+  description = "Time window for blocked-input abuse tracking."
+  type        = number
+  default     = 600
+}
+
+variable "abuse_violation_threshold" {
+  description = "Blocked-input count threshold before cooldown."
+  type        = number
+  default     = 5
+}
+
+variable "abuse_cooldown_seconds" {
+  description = "Cooldown duration after abuse threshold is crossed."
+  type        = number
+  default     = 900
+}
+
+variable "rate_limit_fail_open" {
+  description = "Allow requests if Redis rate-limit backend is unavailable."
+  type        = bool
+  default     = true
+}

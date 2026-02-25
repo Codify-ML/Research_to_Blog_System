@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from hmac import compare_digest
 from uuid import uuid4
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -19,9 +19,15 @@ from packages.core.constants import AgentStatus, LLMMode
 from packages.core.errors import (
     JobNotFoundError,
     QueueUnavailableError,
+    RateLimitUnavailableError,
     SafetyUnavailableError,
 )
 from packages.core.job_store import get_job_store
+from packages.core.rate_limit import (
+    RateLimitDecision,
+    RateLimitService,
+    build_rate_limit_identity,
+)
 from packages.core.safety import SafetyService
 from packages.core.settings import get_settings
 from packages.graph.workflow import initial_state
@@ -60,6 +66,45 @@ def _safety_input_text(request: GenerateRequest) -> str:
     )
 
 
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        first = forwarded.split(",", maxsplit=1)[0].strip()
+        if first:
+            return first
+    if request.client is not None and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _rate_limit_identity(
+    *,
+    request: Request,
+    provided_api_key: str | None,
+) -> str:
+    return build_rate_limit_identity(
+        api_key=provided_api_key,
+        client_ip=_client_ip(request),
+    )
+
+
+def _raise_rate_limit_response(decision: RateLimitDecision) -> None:
+    detail = ApiErrorResponse(
+        code=decision.code or "RATE_LIMITED",
+        message=decision.message or "Rate limit exceeded.",
+        retry_after_seconds=decision.retry_after_seconds,
+    ).model_dump()
+    raise HTTPException(status_code=429, detail=detail)
+
+
+def _handle_rate_limit_unavailable(exc: RateLimitUnavailableError) -> None:
+    detail = ApiErrorResponse(
+        code="RATE_LIMIT_UNAVAILABLE",
+        message="Rate limit checks are unavailable. Please retry later.",
+    ).model_dump()
+    raise HTTPException(status_code=503, detail=detail) from exc
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Research to Blog API", version="0.2.0")
 
@@ -76,8 +121,20 @@ def create_app() -> FastAPI:
         if isinstance(exc.detail, dict):
             code = exc.detail.get("code")
             message = exc.detail.get("message")
-            if isinstance(code, str) and isinstance(message, str):
-                payload = ApiErrorResponse(code=code, message=message)
+            retry_after_seconds = exc.detail.get("retry_after_seconds")
+            if (
+                isinstance(code, str)
+                and isinstance(message, str)
+                and (
+                    retry_after_seconds is None
+                    or isinstance(retry_after_seconds, int)
+                )
+            ):
+                payload = ApiErrorResponse(
+                    code=code,
+                    message=message,
+                    retry_after_seconds=retry_after_seconds,
+                )
                 return JSONResponse(
                     status_code=exc.status_code,
                     content=payload.model_dump(),
@@ -114,12 +171,34 @@ def create_app() -> FastAPI:
     @app.post("/generate", response_model=GenerateResponse)
     def generate(
         request: GenerateRequest,
+        raw_request: Request,
         x_api_key: str | None = Header(default=None, alias="X-API-Key"),
     ) -> GenerateResponse:
         _enforce_api_auth(provided_api_key=x_api_key)
         store = get_job_store()
         settings = get_settings()
         safety = SafetyService(settings)
+        limiter = RateLimitService(settings)
+        rate_limit_identity = _rate_limit_identity(
+            request=raw_request,
+            provided_api_key=x_api_key,
+        )
+
+        try:
+            cooldown_decision = limiter.check_cooldown(rate_limit_identity)
+        except RateLimitUnavailableError as exc:
+            _handle_rate_limit_unavailable(exc)
+        if cooldown_decision.blocked:
+            _raise_rate_limit_response(cooldown_decision)
+
+        try:
+            generate_limit_decision = limiter.check_generate(
+                rate_limit_identity
+            )
+        except RateLimitUnavailableError as exc:
+            _handle_rate_limit_unavailable(exc)
+        if generate_limit_decision.blocked:
+            _raise_rate_limit_response(generate_limit_decision)
 
         selected_mode = request.llm_mode
         if selected_mode is None:
@@ -158,6 +237,15 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=503, detail=detail) from exc
 
         if input_decision.blocked:
+            try:
+                violation_decision = limiter.record_policy_violation(
+                    rate_limit_identity
+                )
+            except RateLimitUnavailableError as exc:
+                _handle_rate_limit_unavailable(exc)
+            if violation_decision.blocked:
+                _raise_rate_limit_response(violation_decision)
+
             detail = ApiErrorResponse(
                 code="POLICY_BLOCKED_INPUT",
                 message=input_decision.message,
@@ -199,9 +287,24 @@ def create_app() -> FastAPI:
     @app.get("/status/{job_id}", response_model=StatusResponse)
     def status(
         job_id: str,
+        raw_request: Request,
         x_api_key: str | None = Header(default=None, alias="X-API-Key"),
     ) -> StatusResponse:
         _enforce_api_auth(provided_api_key=x_api_key)
+        settings = get_settings()
+        limiter = RateLimitService(settings)
+        rate_limit_identity = _rate_limit_identity(
+            request=raw_request,
+            provided_api_key=x_api_key,
+        )
+
+        try:
+            status_limit_decision = limiter.check_status(rate_limit_identity)
+        except RateLimitUnavailableError as exc:
+            _handle_rate_limit_unavailable(exc)
+        if status_limit_decision.blocked:
+            _raise_rate_limit_response(status_limit_decision)
+
         store = get_job_store()
 
         try:

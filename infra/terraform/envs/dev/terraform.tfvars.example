@@ -54,3 +54,12 @@ image_tag = "latest"
 # Runtime defaults.
 use_mock_llm = false
 mock_mode_strict = false
+
+# API abuse/rate-limiting defaults.
+rate_limit_enabled = true
+rate_limit_generate_per_minute = 20
+rate_limit_status_per_minute = 120
+abuse_window_seconds = 600
+abuse_violation_threshold = 5
+abuse_cooldown_seconds = 900
+rate_limit_fail_open = true

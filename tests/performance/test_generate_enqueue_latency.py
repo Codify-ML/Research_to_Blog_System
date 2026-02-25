@@ -16,6 +16,8 @@ def perf_client(tmp_path, monkeypatch):
     monkeypatch.setenv("JOB_STORE_BACKEND", "sqlite")
     monkeypatch.setenv("USE_MOCK_LLM", "true")
     monkeypatch.setenv("MOCK_MODE_STRICT", "true")
+    monkeypatch.setenv("RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("RATE_LIMIT_FAIL_OPEN", "true")
 
     get_settings.cache_clear()
     get_job_store.cache_clear()

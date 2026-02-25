@@ -16,6 +16,8 @@ def auth_client(tmp_path, monkeypatch):
     monkeypatch.setenv("MOCK_MODE_STRICT", "true")
     monkeypatch.setenv("API_AUTH_ENABLED", "true")
     monkeypatch.setenv("API_AUTH_KEY", "test-api-key")
+    monkeypatch.setenv("RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("RATE_LIMIT_FAIL_OPEN", "true")
 
     get_settings.cache_clear()
     get_job_store.cache_clear()

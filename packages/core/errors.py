@@ -8,3 +8,7 @@ class JobNotFoundError(KeyError):
 
 class SafetyUnavailableError(RuntimeError):
     """Raised when safety checks cannot complete in fail-closed mode."""
+
+
+class RateLimitUnavailableError(RuntimeError):
+    """Raised when rate-limit checks cannot complete in fail-closed mode."""

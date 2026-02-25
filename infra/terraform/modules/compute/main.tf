@@ -38,6 +38,34 @@ locals {
     },
     { name = "OPENAI_MODEL_WRITER", value = var.openai_model_writer },
     { name = "OPENAI_MODEL_EDITOR", value = var.openai_model_editor },
+    {
+      name  = "RATE_LIMIT_ENABLED"
+      value = tostring(var.rate_limit_enabled)
+    },
+    {
+      name  = "RATE_LIMIT_GENERATE_PER_MINUTE"
+      value = tostring(var.rate_limit_generate_per_minute)
+    },
+    {
+      name  = "RATE_LIMIT_STATUS_PER_MINUTE"
+      value = tostring(var.rate_limit_status_per_minute)
+    },
+    {
+      name  = "ABUSE_WINDOW_SECONDS"
+      value = tostring(var.abuse_window_seconds)
+    },
+    {
+      name  = "ABUSE_VIOLATION_THRESHOLD"
+      value = tostring(var.abuse_violation_threshold)
+    },
+    {
+      name  = "ABUSE_COOLDOWN_SECONDS"
+      value = tostring(var.abuse_cooldown_seconds)
+    },
+    {
+      name  = "RATE_LIMIT_FAIL_OPEN"
+      value = tostring(var.rate_limit_fail_open)
+    },
     { name = "JOB_STORE_BACKEND", value = "postgres" },
     { name = "REDIS_URL", value = "${local.redis_base_url}/0" },
     { name = "CELERY_BROKER_URL", value = "${local.redis_base_url}/0" },
