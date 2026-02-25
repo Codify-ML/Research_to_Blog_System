@@ -183,8 +183,12 @@ See:
 ## CI/CD Behavior
 Workflow file:
 - `.github/workflows/build-and-push-images.yml`
+- `.github/workflows/pr-quality-gates.yml`
 
 Behavior:
+- PR quality workflow:
+  `.github/workflows/pr-quality-gates.yml` runs `lint`,
+  `test-unit`, and `test-integration` for PRs into `main`.
 - PRs to `main`: build + Terraform plan validation.
 - Non-`main` pushes: build + plan by default.
 - `main` pushes: full deploy path (build/push/apply/stabilize/smoke).

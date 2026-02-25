@@ -1,9 +1,12 @@
 # CI Validation Runbook
 
-This runbook validates the branch behavior in
-`.github/workflows/build-and-push-images.yml`.
+This runbook validates CI behavior in:
+- `.github/workflows/pr-quality-gates.yml`
+- `.github/workflows/build-and-push-images.yml`
 
 ## Scope
+- `pull_request` to `main` runs PR quality gates:
+  `lint` + `test-unit` + `test-integration`.
 - `pull_request` to `main` runs `build` and then `plan`.
 - `push` to non-`main` branches runs `build` and then `plan`.
 - Optional feature-branch deploy override can run full `deploy` on a
@@ -27,6 +30,7 @@ This runbook validates the branch behavior in
 ## Test Matrix
 | Scenario | Trigger | Expected Action |
 |---|---|---|
+| PR quality gates | `pull_request` target `main` | lint + unit + integration |
 | Feature branch push | `push` (`refs/heads/feature/*`) | `build` + `plan` |
 | Feature deploy override | `push` where `ENABLE_FEATURE_DEPLOY=true` and `github.ref == FEATURE_DEPLOY_REF` | `deploy` |
 | PR to main | `pull_request` target `main` | `build` + `plan` |
@@ -34,7 +38,15 @@ This runbook validates the branch behavior in
 | Manual run | `workflow_dispatch` | selected input action |
 
 ## Validation Steps
-1. Feature branch validation
+1. PR quality gates validation
+   - Open PR into `main` with changes under tracked paths.
+   - Confirm `PR Quality Gates` workflow starts.
+   - Confirm these steps pass:
+     - `Lint`
+     - `Unit tests`
+     - `Integration tests`
+
+2. Feature branch validation
    - Push a branch with a change in a tracked path
      (`apps/**`, `packages/**`, `docker/**`,
      `infra/terraform/**`, `scripts/release.py`, `Makefile`,
@@ -45,13 +57,13 @@ This runbook validates the branch behavior in
      `action=plan`, `services=api,worker,ui`, `run_smoke=false`.
    - Confirm logs run `terraform ... plan` and do not run apply.
 
-2. PR validation
+3. PR validation
    - Open PR from feature branch into `main`.
    - Confirm run starts and includes Docker build validation.
    - Confirm run resolves to `action=plan`.
    - Confirm plan runs and apply does not run.
 
-3. Main validation
+4. Main validation
    - Merge PR to `main`.
    - Confirm run resolves to:
      `action=deploy`, `run_smoke=true`.
@@ -59,12 +71,12 @@ This runbook validates the branch behavior in
      docker build/push, terraform apply, ECS stable wait,
      smoke polling to terminal success.
 
-4. Manual dispatch validation
+5. Manual dispatch validation
    - Use `workflow_dispatch`.
    - Run `plan`, then `smoke` (`mock` and `openai`).
    - Confirm behavior matches selected action.
 
-5. Feature deploy override validation (optional)
+6. Feature deploy override validation (optional)
    - In GitHub Environment vars, set:
      `ENABLE_FEATURE_DEPLOY=true`
      and `FEATURE_DEPLOY_REF=refs/heads/<branch>`.
@@ -75,6 +87,7 @@ This runbook validates the branch behavior in
      (`ENABLE_FEATURE_DEPLOY=false`).
 
 ## Acceptance Criteria
+- PR quality gates pass for PRs to `main`.
 - No PR run performs apply.
 - PR/non-main runs perform Docker build validation.
 - Non-main pushes only perform deploy when explicit feature override is
