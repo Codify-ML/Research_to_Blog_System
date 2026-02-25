@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime
 
 from packages.core.llm_client import get_llm_client
@@ -28,6 +29,12 @@ from packages.graph.research_tools import (
     should_use_web_search,
 )
 from packages.graph.schemas import EditorDecision
+
+_URL_PATTERN = re.compile(r"https?://[^\s\])>]+")
+_CITATION_MARKER_PATTERN = re.compile(
+    r"\[(?:source|citation)\s*:",
+    re.IGNORECASE,
+)
 
 
 def build_agent_functions(settings: Settings):
@@ -96,6 +103,7 @@ def build_agent_functions(settings: Settings):
         notes = [line for line in notes if line]
         if not notes:
             notes = ["No external notes returned by researcher model."]
+        notes = _ensure_citation_metadata(notes)
         summary = notes[0][:200]
         return notes, summary, client.get_last_tool_usage()
 
@@ -200,3 +208,27 @@ def _parse_editor_decision(raw: str) -> EditorDecision:
         strengths=["Draft appears coherent and generally well-structured."],
         weaknesses=["Could further improve depth with one extra example."],
     )
+
+
+def _ensure_citation_metadata(notes: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for note in notes:
+        text = note.strip()
+        if not text:
+            continue
+        if _has_citation(text):
+            normalized.append(text)
+            continue
+        normalized.append(
+            text
+            + " [source: n/a; url: n/a; date: unknown]"
+        )
+    return normalized
+
+
+def _has_citation(text: str) -> bool:
+    if _URL_PATTERN.search(text):
+        return True
+    if _CITATION_MARKER_PATTERN.search(text):
+        return True
+    return False

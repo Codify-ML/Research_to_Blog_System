@@ -93,23 +93,32 @@ _SENSITIVE_DATA_PATTERNS = (
 class SafetyDecision:
     blocked: bool
     reason_codes: list[str] = field(default_factory=list)
+    signals: list[str] = field(default_factory=list)
     message: str = ""
 
     @classmethod
     def allow(cls) -> SafetyDecision:
-        return cls(blocked=False, reason_codes=[], message="")
+        return cls(
+            blocked=False,
+            reason_codes=[],
+            signals=[],
+            message="",
+        )
 
     @classmethod
     def block(
         cls,
         *,
         reason_codes: list[str],
+        signals: list[str] | None,
         prefix: str,
     ) -> SafetyDecision:
         sorted_codes = sorted(set(reason_codes))
+        ordered_signals = _dedupe_preserve_order(signals or [])
         return cls(
             blocked=True,
             reason_codes=sorted_codes,
+            signals=ordered_signals,
             message=f"{prefix}: {', '.join(sorted_codes)}.",
         )
 
@@ -146,30 +155,58 @@ class SafetyService:
             return SafetyDecision.allow()
 
         reason_codes: list[str] = []
-        if self.settings.safety_profanity_enabled and _contains_profanity(
-            candidate
-        ):
+        signals: list[str] = []
+
+        profanity_signals = _profanity_signals(candidate)
+        if self.settings.safety_profanity_enabled and profanity_signals:
             reason_codes.append("SAFETY_PROFANITY")
+            signals.extend(
+                f"profanity:{signal}"
+                for signal in profanity_signals
+            )
+        hate_signals = _hate_content_signals(candidate)
         if (
             self.settings.safety_hate_content_enabled
-            and _contains_hate_content(candidate)
+            and hate_signals
         ):
             reason_codes.append("SAFETY_HATE_CONTENT")
+            signals.extend(
+                f"hate:{signal}"
+                for signal in hate_signals
+            )
+        prompt_injection_signals = (
+            _prompt_injection_or_exfiltration_signals(candidate)
+        )
         if (
             self.settings.safety_prompt_injection_enabled
-            and _contains_prompt_injection_or_exfiltration(candidate)
+            and prompt_injection_signals
         ):
             reason_codes.append("SAFETY_PROMPT_INJECTION")
+            signals.extend(
+                f"prompt_injection:{signal}"
+                for signal in prompt_injection_signals
+            )
+        sensitive_data_signals = _sensitive_data_signals(candidate)
         if (
             self.settings.safety_sensitive_data_enabled
-            and _contains_sensitive_data(candidate)
+            and sensitive_data_signals
         ):
             reason_codes.append("SAFETY_SENSITIVE_DATA")
+            signals.extend(
+                f"sensitive_data:{signal}"
+                for signal in sensitive_data_signals
+            )
 
-        reason_codes.extend(self._moderation_reason_codes(candidate))
+        moderation_codes = self._moderation_reason_codes(candidate)
+        reason_codes.extend(moderation_codes)
+        signals.extend(
+            f"moderation:{code.lower()}"
+            for code in moderation_codes
+        )
         if reason_codes:
             return SafetyDecision.block(
                 reason_codes=reason_codes,
+                signals=signals,
                 prefix=policy_prefix,
             )
         return SafetyDecision.allow()
@@ -230,45 +267,83 @@ class SafetyService:
 
 
 def _contains_profanity(text: str) -> bool:
+    return bool(_profanity_signals(text))
+
+
+def _profanity_signals(text: str) -> list[str]:
+    signals: list[str] = []
+    normalized_tokens = _normalize_for_keyword_scan(text).split()
+    token_set = set(normalized_tokens)
+
     if profanity is not None:
         try:
             if profanity.contains_profanity(text):
-                return True
+                censor_words = getattr(
+                    profanity,
+                    "CENSOR_WORDSET",
+                    set(),
+                )
+                censor_word_set = {
+                    str(word).lower().strip()
+                    for word in censor_words
+                    if str(word).strip()
+                }
+                # Avoid substring false positives (e.g. "intuit"):
+                # only accept exact token intersections.
+                signals.extend(
+                    sorted(token_set.intersection(censor_word_set))
+                )
         except Exception:  # pragma: no cover - defensive
             pass
-    return bool(_FALLBACK_PROFANITY_PATTERN.search(text))
+
+    signals.extend(
+        match.group(1).lower().strip()
+        for match in _FALLBACK_PROFANITY_PATTERN.finditer(text)
+    )
+    return _dedupe_preserve_order(signals)
 
 
 def _contains_hate_content(text: str) -> bool:
+    return bool(_hate_content_signals(text))
+
+
+def _hate_content_signals(text: str) -> list[str]:
     normalized = _normalize_for_keyword_scan(text)
     if not normalized:
-        return False
+        return []
 
     compact = normalized.replace(" ", "")
+    matches: list[str] = []
     for term in _HATE_CONTENT_TERMS:
         term_normalized = term.lower().strip()
         if " " in term_normalized:
             if term_normalized in normalized:
-                return True
+                matches.append(term_normalized)
             if term_normalized.replace(" ", "") in compact:
-                return True
+                matches.append(term_normalized)
             continue
         if re.search(rf"\b{re.escape(term_normalized)}\b", normalized):
-            return True
+            matches.append(term_normalized)
         if term_normalized in compact:
-            return True
+            matches.append(term_normalized)
 
-    return False
+    return _dedupe_preserve_order(matches)
 
 
 def _contains_prompt_injection_or_exfiltration(text: str) -> bool:
+    return bool(_prompt_injection_or_exfiltration_signals(text))
+
+
+def _prompt_injection_or_exfiltration_signals(text: str) -> list[str]:
     normalized = _normalize_for_keyword_scan(text)
     if not normalized:
-        return False
-    return any(
-        pattern.search(normalized)
+        return []
+    matches = [
+        pattern.pattern
         for pattern in _PROMPT_INJECTION_PATTERNS
-    )
+        if pattern.search(normalized)
+    ]
+    return _dedupe_preserve_order(matches)
 
 
 def _normalize_for_keyword_scan(text: str) -> str:
@@ -278,10 +353,15 @@ def _normalize_for_keyword_scan(text: str) -> str:
 
 
 def _contains_sensitive_data(text: str) -> bool:
-    return any(
-        pattern.search(text)
-        for pattern in _SENSITIVE_DATA_PATTERNS
-    )
+    return bool(_sensitive_data_signals(text))
+
+
+def _sensitive_data_signals(text: str) -> list[str]:
+    matches: list[str] = []
+    for pattern in _SENSITIVE_DATA_PATTERNS:
+        if pattern.search(text):
+            matches.append(pattern.pattern)
+    return _dedupe_preserve_order(matches)
 
 
 def _categories_bool_map(raw_categories: object) -> dict[str, bool]:
@@ -321,3 +401,15 @@ def _category_to_reason_code(name: str) -> str:
     if not normalized:
         return "SAFETY_MODERATION_FLAGGED"
     return f"SAFETY_{normalized.upper()}"
+
+
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for item in items:
+        normalized = item.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        ordered.append(normalized)
+    return ordered

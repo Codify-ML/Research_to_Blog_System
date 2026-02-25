@@ -110,7 +110,25 @@ def test_get_status_maps_payload_and_terminal_property():
                 "editor_strengths": ["Clear structure."],
                 "editor_weaknesses": ["Could use stronger examples."],
                 "error_message": None,
+                "created_at": "2026-02-23T00:00:00+00:00",
                 "updated_at": "2026-02-23T00:00:00+00:00",
+                "status_transitions": [
+                    {
+                        "from": None,
+                        "to": "PENDING",
+                        "at": "2026-02-23T00:00:00+00:00",
+                    },
+                    {
+                        "from": "PENDING",
+                        "to": "RUNNING",
+                        "at": "2026-02-23T00:00:05+00:00",
+                    },
+                    {
+                        "from": "RUNNING",
+                        "to": "COMPLETED",
+                        "at": "2026-02-23T00:00:15+00:00",
+                    },
+                ],
             },
         )
     )
@@ -136,6 +154,8 @@ def test_get_status_maps_payload_and_terminal_property():
     assert result.editor_strengths == ["Clear structure."]
     assert result.editor_weaknesses == ["Could use stronger examples."]
     assert result.research_notes == ["n1", "n2"]
+    assert result.created_at == "2026-02-23T00:00:00+00:00"
+    assert len(result.status_transitions) == 3
     assert result.is_terminal is True
 
 
@@ -188,6 +208,7 @@ def test_api_error_maps_policy_block_metadata():
                     "message": "Input blocked by safety policy.",
                     "blocked_category": "hate_content",
                     "reason_codes": ["SAFETY_HATE_CONTENT"],
+                    "safety_signals": ["hate:racist"],
                 }
             },
         )
@@ -215,6 +236,7 @@ def test_api_error_maps_policy_block_metadata():
     assert exc.error_code == "POLICY_BLOCKED_INPUT"
     assert exc.blocked_category == "hate_content"
     assert exc.reason_codes == ["SAFETY_HATE_CONTENT"]
+    assert exc.safety_signals == ["hate:racist"]
 
 
 def test_transport_error_is_wrapped():

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import requests
@@ -18,6 +18,7 @@ class ApiClientError(RuntimeError):
         retry_after_seconds: int | None = None,
         blocked_category: str | None = None,
         reason_codes: list[str] | None = None,
+        safety_signals: list[str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
@@ -25,6 +26,7 @@ class ApiClientError(RuntimeError):
         self.retry_after_seconds = retry_after_seconds
         self.blocked_category = blocked_category
         self.reason_codes = reason_codes
+        self.safety_signals = safety_signals
 
 
 @dataclass(frozen=True)
@@ -55,6 +57,10 @@ class StatusResult:
     editor_weaknesses: list[str]
     error_message: str | None
     updated_at: str
+    created_at: str = ""
+    status_transitions: list[dict[str, str | None]] = field(
+        default_factory=list
+    )
 
     @property
     def is_terminal(self) -> bool:
@@ -132,7 +138,11 @@ class ApiClient:
             editor_strengths=list(payload.get("editor_strengths", [])),
             editor_weaknesses=list(payload.get("editor_weaknesses", [])),
             error_message=payload.get("error_message"),
+            created_at=str(payload.get("created_at", "")),
             updated_at=str(payload["updated_at"]),
+            status_transitions=list(
+                payload.get("status_transitions", [])
+            ),
         )
 
     def _request(
@@ -188,6 +198,18 @@ class ApiClient:
             and all(isinstance(item, str) for item in raw_reason_codes)
         ):
             reason_codes = [str(item) for item in raw_reason_codes]
+        raw_safety_signals = detail.get("safety_signals")
+        safety_signals: list[str] | None = None
+        if (
+            isinstance(raw_safety_signals, list)
+            and all(
+                isinstance(item, str) for item in raw_safety_signals
+            )
+        ):
+            safety_signals = [
+                str(item)
+                for item in raw_safety_signals
+            ]
         message = (
             detail.get("message") or response.text or "API request failed."
         )
@@ -206,4 +228,5 @@ class ApiClient:
                 else None
             ),
             reason_codes=reason_codes,
+            safety_signals=safety_signals,
         )

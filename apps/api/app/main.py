@@ -144,12 +144,24 @@ def create_app() -> FastAPI:
             retry_after_seconds = exc.detail.get("retry_after_seconds")
             blocked_category = exc.detail.get("blocked_category")
             raw_reason_codes = exc.detail.get("reason_codes")
+            raw_safety_signals = exc.detail.get("safety_signals")
             reason_codes: list[str] | None = None
             if (
                 isinstance(raw_reason_codes, list)
                 and all(isinstance(item, str) for item in raw_reason_codes)
             ):
                 reason_codes = [str(item) for item in raw_reason_codes]
+            safety_signals: list[str] | None = None
+            if (
+                isinstance(raw_safety_signals, list)
+                and all(
+                    isinstance(item, str) for item in raw_safety_signals
+                )
+            ):
+                safety_signals = [
+                    str(item)
+                    for item in raw_safety_signals
+                ]
             if (
                 isinstance(code, str)
                 and isinstance(message, str)
@@ -168,6 +180,7 @@ def create_app() -> FastAPI:
                         else None
                     ),
                     reason_codes=reason_codes,
+                    safety_signals=safety_signals,
                 )
                 return JSONResponse(
                     status_code=exc.status_code,
@@ -287,6 +300,11 @@ def create_app() -> FastAPI:
                     input_decision.reason_codes
                 ),
                 reason_codes=input_decision.reason_codes,
+                safety_signals=(
+                    input_decision.signals
+                    if settings.safety_explain_enabled
+                    else None
+                ),
             ).model_dump()
             raise HTTPException(status_code=422, detail=detail)
 

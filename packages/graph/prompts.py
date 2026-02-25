@@ -14,6 +14,9 @@ Output contract:
 - Keep each bullet self-contained and factual.
 - Avoid speculation, hype, and unsupported claims.
 - If certainty is low, state uncertainty explicitly.
+- End each bullet with citation metadata in this exact format:
+  [source: <domain/publisher>; url: <https://... or n/a>;
+  date: <YYYY-MM-DD or unknown>]
 """.strip()
 
 WRITER_SYSTEM_PROMPT = """
@@ -84,6 +87,11 @@ def build_researcher_user_prompt(
         f"- Return {notes_min} to {notes_max} bullet points.\n"
         "- Prioritize correctness and source quality.\n"
         f"- Use at most {max_sources} distinct sources.\n"
+        "- Every bullet must include citation metadata using this format:\n"
+        "  [source: <domain/publisher>; "
+        "url: <https://... or n/a>; "
+        "date: <YYYY-MM-DD or unknown>]\n"
+        "- If no reliable citation exists for a claim, omit the claim.\n"
         f"- {_research_depth_guidance(research_depth)}\n"
     )
 

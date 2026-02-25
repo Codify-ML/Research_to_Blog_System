@@ -30,9 +30,21 @@ def default_research(
     del length_preference
     del research_depth
     notes = [
-        f"Define the problem space for: {topic}.",
-        f"List practical implementation constraints for: {topic}.",
-        f"Capture risks and mitigations relevant to: {topic}.",
+        (
+            f"Define the problem space for: {topic}. "
+            "[source: internal mock knowledge; url: n/a; "
+            "date: unknown]"
+        ),
+        (
+            f"List practical implementation constraints for: {topic}. "
+            "[source: internal mock knowledge; url: n/a; "
+            "date: unknown]"
+        ),
+        (
+            f"Capture risks and mitigations relevant to: {topic}. "
+            "[source: internal mock knowledge; url: n/a; "
+            "date: unknown]"
+        ),
     ]
     summary = f"Structured starter research generated for topic: {topic}."
     return notes, summary, []

@@ -109,6 +109,8 @@ def test_research_prompt_includes_reference_date_and_freshness_policy() -> (
     assert "at most 5 distinct sources" in prompt
     assert "Research depth: standard" in prompt
     assert "Return 4 to 7 bullet points." in prompt
+    assert "Every bullet must include citation metadata" in prompt
+    assert "url: <https://... or n/a>" in prompt
 
 
 def test_writer_prompt_adds_linkedin_emoji_guidance() -> None:
