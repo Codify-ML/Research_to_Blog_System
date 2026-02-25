@@ -174,6 +174,8 @@ def test_happy_path_lifecycle_and_idempotent_polling(client, monkeypatch):
     assert isinstance(payload["research_tools_used"], list)
     assert isinstance(payload["research_notes"], list)
     assert payload["research_notes"]
+    assert isinstance(payload["processing_duration_ms"], int)
+    assert payload["processing_duration_ms"] >= 0
 
     transitions = payload["status_transitions"]
     transition_targets = [t["to"] for t in transitions]

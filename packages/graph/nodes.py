@@ -1,6 +1,8 @@
 from collections.abc import Callable
 
 from packages.core.constants import AgentStatus
+from packages.core.observability import get_observability, update_span
+from packages.core.settings import get_settings
 from packages.graph.schemas import EditorDecision
 from packages.graph.state import AgentState
 
@@ -16,6 +18,18 @@ EditorFn = Callable[
     [str, str, list[str], int, str, str, str],
     EditorDecision,
 ]
+
+
+def _capture_content_enabled() -> bool:
+    return get_settings().langfuse_capture_content
+
+
+def _as_observability_payload(
+    payload: dict[str, object],
+) -> dict[str, object] | None:
+    if not _capture_content_enabled():
+        return None
+    return payload
 
 
 def default_research(
@@ -154,19 +168,47 @@ def make_researcher_node(
     research_impl = research_fn or default_research
 
     def researcher_node(state: AgentState) -> dict[str, object]:
-        notes, _summary, tools_used = research_impl(
-            state["topic"],
-            state["max_sources"],
-            state["content_format"],
-            state["length_preference"],
-            state["research_depth"],
-        )
-        return {
-            "status": AgentStatus.RUNNING,
-            "research_tools_used": tools_used,
-            "research_notes": notes,
-            "error_message": None,
-        }
+        settings = get_settings()
+        observability = get_observability(settings)
+        with observability.span(
+            name="graph.node.researcher",
+            input_payload=_as_observability_payload(
+                {
+                    "topic": state["topic"],
+                    "max_sources": state["max_sources"],
+                    "research_depth": state["research_depth"],
+                }
+            ),
+            metadata={"job_id": state["job_id"]},
+        ) as span:
+            notes, _summary, tools_used = research_impl(
+                state["topic"],
+                state["max_sources"],
+                state["content_format"],
+                state["length_preference"],
+                state["research_depth"],
+            )
+            output = {
+                "status": AgentStatus.RUNNING,
+                "research_tools_used": tools_used,
+                "research_notes": notes,
+                "error_message": None,
+            }
+            update_span(
+                span,
+                output_payload=_as_observability_payload(
+                    {
+                        "note_count": len(notes),
+                        "research_notes": notes,
+                        "tools_used": tools_used,
+                    }
+                ),
+                metadata={
+                    "note_count": len(notes),
+                    "tool_count": len(tools_used),
+                },
+            )
+            return output
 
     return researcher_node
 
@@ -177,21 +219,44 @@ def make_writer_node(
     writer_impl = writer_fn or default_writer
 
     def writer_node(state: AgentState) -> dict[str, object]:
-        draft = writer_impl(
-            state["topic"],
-            state["research_notes"],
-            state["editor_feedback"],
-            state["draft"],
-            state["content_format"],
-            state["content_context"],
-            state["tone"],
-            state["length_preference"],
-        )
-        return {
-            "status": AgentStatus.RUNNING,
-            "draft": draft,
-            "error_message": None,
-        }
+        settings = get_settings()
+        observability = get_observability(settings)
+        with observability.span(
+            name="graph.node.writer",
+            input_payload=_as_observability_payload(
+                {
+                    "topic": state["topic"],
+                    "research_notes": state["research_notes"],
+                    "editor_feedback": state["editor_feedback"],
+                    "tone": state["tone"],
+                    "length_preference": state["length_preference"],
+                }
+            ),
+            metadata={"job_id": state["job_id"]},
+        ) as span:
+            draft = writer_impl(
+                state["topic"],
+                state["research_notes"],
+                state["editor_feedback"],
+                state["draft"],
+                state["content_format"],
+                state["content_context"],
+                state["tone"],
+                state["length_preference"],
+            )
+            output = {
+                "status": AgentStatus.RUNNING,
+                "draft": draft,
+                "error_message": None,
+            }
+            update_span(
+                span,
+                output_payload=_as_observability_payload(
+                    {"draft": draft}
+                ),
+                metadata={"draft_char_count": len(draft)},
+            )
+            return output
 
     return writer_node
 
@@ -202,45 +267,91 @@ def make_editor_node(
     editor_impl = editor_fn or default_editor
 
     def editor_node(state: AgentState) -> dict[str, object]:
-        decision = editor_impl(
-            state["topic"],
-            state["draft"],
-            state["research_notes"],
-            state["revision_count"],
-            state["content_format"],
-            state["tone"],
-            state["length_preference"],
-        )
+        settings = get_settings()
+        observability = get_observability(settings)
+        with observability.span(
+            name="graph.node.editor",
+            input_payload=_as_observability_payload(
+                {
+                    "topic": state["topic"],
+                    "draft": state["draft"],
+                    "research_notes": state["research_notes"],
+                    "revision_count": state["revision_count"],
+                }
+            ),
+            metadata={"job_id": state["job_id"]},
+        ) as span:
+            decision = editor_impl(
+                state["topic"],
+                state["draft"],
+                state["research_notes"],
+                state["revision_count"],
+                state["content_format"],
+                state["tone"],
+                state["length_preference"],
+            )
 
-        if decision.is_approved:
+            update_span(
+                span,
+                output_payload=_as_observability_payload(
+                    {
+                        "is_approved": decision.is_approved,
+                        "feedback": decision.feedback,
+                        "strengths": decision.strengths,
+                        "weaknesses": decision.weaknesses,
+                    }
+                ),
+                metadata={
+                    "approved": decision.is_approved,
+                    "feedback_count": len(decision.feedback),
+                    "strength_count": len(decision.strengths),
+                    "weakness_count": len(decision.weaknesses),
+                },
+            )
+
+            if decision.is_approved:
+                return {
+                    "status": AgentStatus.COMPLETED,
+                    "is_approved": True,
+                    "editor_feedback": decision.feedback,
+                    "editor_strengths": decision.strengths,
+                    "editor_weaknesses": decision.weaknesses,
+                    "error_message": None,
+                }
+
             return {
-                "status": AgentStatus.COMPLETED,
-                "is_approved": True,
+                "status": AgentStatus.RUNNING,
+                "is_approved": False,
                 "editor_feedback": decision.feedback,
                 "editor_strengths": decision.strengths,
                 "editor_weaknesses": decision.weaknesses,
+                "revision_count": state["revision_count"] + 1,
                 "error_message": None,
             }
-
-        return {
-            "status": AgentStatus.RUNNING,
-            "is_approved": False,
-            "editor_feedback": decision.feedback,
-            "editor_strengths": decision.strengths,
-            "editor_weaknesses": decision.weaknesses,
-            "revision_count": state["revision_count"] + 1,
-            "error_message": None,
-        }
 
     return editor_node
 
 
 def escalation_node(state: AgentState) -> dict[str, object]:
-    return {
-        "status": AgentStatus.ESCALATED,
-        "is_approved": False,
-        "error_message": (
-            "Editor rejected the draft more than 3 times. "
-            "Escalated to failure path as loop guard protection."
-        ),
-    }
+    settings = get_settings()
+    observability = get_observability(settings)
+    with observability.span(
+        name="graph.node.escalation",
+        metadata={"job_id": state["job_id"]},
+    ) as span:
+        output = {
+            "status": AgentStatus.ESCALATED,
+            "is_approved": False,
+            "error_message": (
+                "Editor rejected the draft more than 3 times. "
+                "Escalated to failure path as loop guard protection."
+            ),
+        }
+        update_span(
+            span,
+            output_payload=_as_observability_payload(output),
+            metadata={"escalated": True},
+            level="WARNING",
+            status_message=str(output["error_message"]),
+        )
+        return output

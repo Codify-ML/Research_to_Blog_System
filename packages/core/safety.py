@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from openai import OpenAI
 
 from packages.core.errors import SafetyUnavailableError
+from packages.core.observability import get_observability, update_span
 from packages.core.settings import Settings
 
 try:  # pragma: no cover - optional fallback
@@ -135,16 +136,68 @@ class SafetyService:
             self._moderation_client = OpenAI(api_key=settings.openai_api_key)
 
     def classify_input(self, text: str) -> SafetyDecision:
-        return self._classify(
+        return self._classify_with_trace(
             text=text,
             policy_prefix="Input blocked by safety policy",
+            span_name="safety.classify_input",
         )
 
     def classify_output(self, text: str) -> SafetyDecision:
-        return self._classify(
+        return self._classify_with_trace(
             text=text,
             policy_prefix="Output blocked by safety policy",
+            span_name="safety.classify_output",
         )
+
+    def _classify_with_trace(
+        self,
+        *,
+        text: str,
+        policy_prefix: str,
+        span_name: str,
+    ) -> SafetyDecision:
+        observability = get_observability(self.settings)
+        with observability.span(
+            name=span_name,
+            input_payload=(
+                {"text": text}
+                if self.settings.langfuse_capture_content
+                else None
+            ),
+            metadata={
+                "text_length": len(text),
+                "safety_enabled": self.settings.safety_enabled,
+            },
+        ) as span:
+            decision = self._classify(
+                text=text,
+                policy_prefix=policy_prefix,
+            )
+            update_span(
+                span,
+                output_payload=(
+                    {
+                        "blocked": decision.blocked,
+                        "message": decision.message,
+                        "reason_codes": decision.reason_codes,
+                        "signals": decision.signals,
+                    }
+                    if self.settings.langfuse_capture_content
+                    else None
+                ),
+                metadata={
+                    "blocked": decision.blocked,
+                    "reason_codes": decision.reason_codes,
+                    "signal_count": len(decision.signals),
+                },
+                level="WARNING" if decision.blocked else None,
+                status_message=(
+                    decision.message
+                    if decision.blocked
+                    else "Safety policy check passed."
+                ),
+            )
+            return decision
 
     def _classify(self, *, text: str, policy_prefix: str) -> SafetyDecision:
         if not self.settings.safety_enabled:

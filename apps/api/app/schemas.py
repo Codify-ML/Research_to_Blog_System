@@ -74,6 +74,7 @@ class StatusResponse(BaseModel):
     error_message: str | None
     created_at: str
     updated_at: str
+    processing_duration_ms: int | None = None
     status_transitions: list[dict[str, str | None]]
 
 

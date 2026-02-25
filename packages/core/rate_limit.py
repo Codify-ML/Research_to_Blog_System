@@ -129,6 +129,14 @@ class RateLimitService:
             )
         return RateLimitDecision.allow()
 
+    def backend_available(self) -> bool:
+        if not self.settings.rate_limit_enabled:
+            return True
+        try:
+            return bool(self._client.ping())
+        except RedisError:
+            return False
+
     def _minute_bucket_key(self, scope: str, identity: str) -> str:
         bucket = int(time.time() // 60)
         return f"rl:{scope}:{identity}:{bucket}"
