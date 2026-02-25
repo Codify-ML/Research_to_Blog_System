@@ -39,6 +39,8 @@ def test_generate_policy_blocked_input_returns_422(client):
     payload = response.json()
     assert payload["code"] == "POLICY_BLOCKED_INPUT"
     assert "SAFETY_PROFANITY" in payload["message"]
+    assert payload["blocked_category"] == "profanity"
+    assert payload["reason_codes"] == ["SAFETY_PROFANITY"]
 
 
 def test_generate_hate_content_input_returns_422(client):
@@ -50,6 +52,8 @@ def test_generate_hate_content_input_returns_422(client):
     payload = response.json()
     assert payload["code"] == "POLICY_BLOCKED_INPUT"
     assert "SAFETY_HATE_CONTENT" in payload["message"]
+    assert payload["blocked_category"] == "hate_content"
+    assert payload["reason_codes"] == ["SAFETY_HATE_CONTENT"]
 
 
 def test_generate_prompt_injection_input_returns_422(client):
@@ -65,6 +69,8 @@ def test_generate_prompt_injection_input_returns_422(client):
     payload = response.json()
     assert payload["code"] == "POLICY_BLOCKED_INPUT"
     assert "SAFETY_PROMPT_INJECTION" in payload["message"]
+    assert payload["blocked_category"] == "prompt_injection"
+    assert payload["reason_codes"] == ["SAFETY_PROMPT_INJECTION"]
 
 
 def test_generate_sensitive_data_input_returns_422(client):
@@ -81,6 +87,8 @@ def test_generate_sensitive_data_input_returns_422(client):
     payload = response.json()
     assert payload["code"] == "POLICY_BLOCKED_INPUT"
     assert "SAFETY_SENSITIVE_DATA" in payload["message"]
+    assert payload["blocked_category"] == "sensitive_data"
+    assert payload["reason_codes"] == ["SAFETY_SENSITIVE_DATA"]
 
 
 def test_status_unknown_job_returns_404(client):

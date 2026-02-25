@@ -97,6 +97,26 @@ def _raise_rate_limit_response(decision: RateLimitDecision) -> None:
     raise HTTPException(status_code=429, detail=detail)
 
 
+def _blocked_category_from_reason_codes(
+    reason_codes: list[str],
+) -> str | None:
+    upper_codes = {code.upper() for code in reason_codes}
+    if any(
+        code == "SAFETY_HATE_CONTENT" or code.startswith("SAFETY_HATE")
+        for code in upper_codes
+    ):
+        return "hate_content"
+    if "SAFETY_PROMPT_INJECTION" in upper_codes:
+        return "prompt_injection"
+    if "SAFETY_SENSITIVE_DATA" in upper_codes:
+        return "sensitive_data"
+    if "SAFETY_PROFANITY" in upper_codes:
+        return "profanity"
+    if any(code.startswith("SAFETY_") for code in upper_codes):
+        return "moderation"
+    return None
+
+
 def _handle_rate_limit_unavailable(exc: RateLimitUnavailableError) -> None:
     detail = ApiErrorResponse(
         code="RATE_LIMIT_UNAVAILABLE",
@@ -122,6 +142,14 @@ def create_app() -> FastAPI:
             code = exc.detail.get("code")
             message = exc.detail.get("message")
             retry_after_seconds = exc.detail.get("retry_after_seconds")
+            blocked_category = exc.detail.get("blocked_category")
+            raw_reason_codes = exc.detail.get("reason_codes")
+            reason_codes: list[str] | None = None
+            if (
+                isinstance(raw_reason_codes, list)
+                and all(isinstance(item, str) for item in raw_reason_codes)
+            ):
+                reason_codes = [str(item) for item in raw_reason_codes]
             if (
                 isinstance(code, str)
                 and isinstance(message, str)
@@ -134,6 +162,12 @@ def create_app() -> FastAPI:
                     code=code,
                     message=message,
                     retry_after_seconds=retry_after_seconds,
+                    blocked_category=(
+                        blocked_category
+                        if isinstance(blocked_category, str)
+                        else None
+                    ),
+                    reason_codes=reason_codes,
                 )
                 return JSONResponse(
                     status_code=exc.status_code,
@@ -249,6 +283,10 @@ def create_app() -> FastAPI:
             detail = ApiErrorResponse(
                 code="POLICY_BLOCKED_INPUT",
                 message=input_decision.message,
+                blocked_category=_blocked_category_from_reason_codes(
+                    input_decision.reason_codes
+                ),
+                reason_codes=input_decision.reason_codes,
             ).model_dump()
             raise HTTPException(status_code=422, detail=detail)
 
