@@ -121,6 +121,25 @@ def test_generate_openai_mode_rejected_when_mock_mode_strict(client):
     assert response.json()["code"] == "MOCK_MODE_STRICT"
 
 
+def test_generate_openai_mode_requires_key_when_not_strict(
+    client, monkeypatch
+):
+    from packages.core.job_store import get_job_store
+    from packages.core.settings import get_settings
+
+    monkeypatch.setenv("MOCK_MODE_STRICT", "false")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    get_settings.cache_clear()
+    get_job_store.cache_clear()
+
+    response = client.post(
+        "/generate",
+        json={"topic": "openai mode", "llm_mode": "openai"},
+    )
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()["code"] == "OPENAI_KEY_REQUIRED"
+
+
 def test_happy_path_lifecycle_and_idempotent_polling(client, monkeypatch):
     monkeypatch.setattr(
         "apps.api.app.main.enqueue_generate_job",

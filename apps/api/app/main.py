@@ -241,20 +241,20 @@ def create_app() -> FastAPI:
             else:
                 selected_mode = LLMMode.OPENAI
 
+        if selected_mode == LLMMode.OPENAI and settings.mock_mode_strict:
+            detail = ApiErrorResponse(
+                code="MOCK_MODE_STRICT",
+                message=(
+                    "OPENAI mode is disabled while MOCK_MODE_STRICT is true."
+                ),
+            ).model_dump()
+            raise HTTPException(status_code=422, detail=detail)
         if selected_mode == LLMMode.OPENAI and not settings.openai_api_key:
             detail = ApiErrorResponse(
                 code="OPENAI_KEY_REQUIRED",
                 message=(
                     "OPENAI_API_KEY must be configured to use "
                     "llm_mode='openai'."
-                ),
-            ).model_dump()
-            raise HTTPException(status_code=422, detail=detail)
-        if selected_mode == LLMMode.OPENAI and settings.mock_mode_strict:
-            detail = ApiErrorResponse(
-                code="MOCK_MODE_STRICT",
-                message=(
-                    "OPENAI mode is disabled while MOCK_MODE_STRICT is true."
                 ),
             ).model_dump()
             raise HTTPException(status_code=422, detail=detail)
