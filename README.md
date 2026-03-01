@@ -173,6 +173,9 @@ Operational endpoints:
 - `GET /ready` and `GET /readiness` (alias) for readiness checks.
 
 ## Cloud Deployment (AWS)
+Step-by-step deployment guide:
+- `docs/deployment_runbook.md`
+
 Recommended bootstrap path:
 1. Copy and fill the bootstrap config:
 ```bash
@@ -244,6 +247,7 @@ Behavior:
 
 Validation guide:
 - `docs/ci_validation_runbook.md`
+- `docs/deployment_runbook.md`
 
 ## Security and Secrets
 - Never commit `.env`, `terraform.tfvars`, or real secret values.

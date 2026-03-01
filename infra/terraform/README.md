@@ -3,6 +3,9 @@
 This directory contains the AWS infrastructure definition for the
 Research-to-Blog system.
 
+For full deployment steps (local, cloud, CI), see:
+- `docs/deployment_runbook.md`
+
 ## Cloud System Diagram
 
 ```mermaid
