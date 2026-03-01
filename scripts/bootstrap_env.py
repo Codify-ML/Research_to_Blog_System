@@ -134,14 +134,18 @@ def _validate_config(cfg: BootstrapConfig) -> None:
             ],
         )
         host = cfg.get("APP_LANGFUSE_HOST", "").lower()
-        if any(x in host for x in ("host.docker.internal", "localhost", "127.0.0.1")):
+        if any(
+            x in host
+            for x in ("host.docker.internal", "localhost", "127.0.0.1")
+        ):
             raise BootstrapError(
                 "APP_LANGFUSE_HOST points to a local endpoint. "
                 "Use the cloud Langfuse URL for bootstrap."
             )
         if cfg.get("APP_LANGFUSE_ENVIRONMENT", "").strip().lower() == "local":
             raise BootstrapError(
-                "APP_LANGFUSE_ENVIRONMENT cannot be 'local' for cloud bootstrap."
+                "APP_LANGFUSE_ENVIRONMENT cannot be 'local' "
+                "for cloud bootstrap."
             )
     if cfg.get_bool("ENABLE_LANGFUSE_BOOTSTRAP_INIT", True):
         _require_keys(cfg, ["LANGFUSE_INIT_ORG_ID"])
@@ -202,7 +206,9 @@ def _put_secret(
             "--output",
             "text",
         ]
-        current = _run(current_cmd, env=_aws_env(cfg), capture=True, dry_run=False)
+        current = _run(
+            current_cmd, env=_aws_env(cfg), capture=True, dry_run=False
+        )
         if current == secret_value:
             print(f"= unchanged {secret_id}")
             return
@@ -238,9 +244,13 @@ def _get_secret_value(cfg: BootstrapConfig, secret_id: str) -> str:
 
 def _validate_langfuse_key_format(public_key: str, secret_key: str) -> None:
     if len(public_key.strip()) < 12:
-        raise BootstrapError("LANGFUSE_PUBLIC_KEY appears invalid (too short).")
+        raise BootstrapError(
+            "LANGFUSE_PUBLIC_KEY appears invalid (too short)."
+        )
     if len(secret_key.strip()) < 16:
-        raise BootstrapError("LANGFUSE_SECRET_KEY appears invalid (too short).")
+        raise BootstrapError(
+            "LANGFUSE_SECRET_KEY appears invalid (too short)."
+        )
 
 
 def _resolve_langfuse_project_keys(

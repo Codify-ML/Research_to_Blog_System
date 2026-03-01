@@ -59,9 +59,7 @@ class MockLLMClient:
         with obs.span(
             name="llm.complete",
             input_payload=(
-                {"prompt": prompt}
-                if self.capture_content
-                else None
+                {"prompt": prompt} if self.capture_content else None
             ),
             metadata={
                 "model": model,
@@ -72,9 +70,7 @@ class MockLLMClient:
             update_span(
                 span,
                 output_payload=(
-                    {"output": response_text}
-                    if self.capture_content
-                    else None
+                    {"output": response_text} if self.capture_content else None
                 ),
                 metadata={"tools_used": [], "mock_mode": True},
             )
@@ -110,9 +106,7 @@ class OpenAILLMClient:
         with obs.span(
             name="llm.complete",
             input_payload=(
-                {"prompt": prompt}
-                if self.capture_content
-                else None
+                {"prompt": prompt} if self.capture_content else None
             ),
             metadata={
                 "model": model,
@@ -156,9 +150,7 @@ class OpenAILLMClient:
             update_span(
                 span,
                 output_payload=(
-                    {"output": output_text}
-                    if self.capture_content
-                    else None
+                    {"output": output_text} if self.capture_content else None
                 ),
                 metadata={
                     "tools_used": self._last_tool_usage,

@@ -219,10 +219,7 @@ def _ensure_citation_metadata(notes: list[str]) -> list[str]:
         if _has_citation(text):
             normalized.append(text)
             continue
-        normalized.append(
-            text
-            + " [source: n/a; url: n/a; date: unknown]"
-        )
+        normalized.append(text + " [source: n/a; url: n/a; date: unknown]")
     return normalized
 
 

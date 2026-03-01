@@ -235,22 +235,15 @@ def create_app() -> FastAPI:
             raw_reason_codes = exc.detail.get("reason_codes")
             raw_safety_signals = exc.detail.get("safety_signals")
             reason_codes: list[str] | None = None
-            if (
-                isinstance(raw_reason_codes, list)
-                and all(isinstance(item, str) for item in raw_reason_codes)
+            if isinstance(raw_reason_codes, list) and all(
+                isinstance(item, str) for item in raw_reason_codes
             ):
                 reason_codes = [str(item) for item in raw_reason_codes]
             safety_signals: list[str] | None = None
-            if (
-                isinstance(raw_safety_signals, list)
-                and all(
-                    isinstance(item, str) for item in raw_safety_signals
-                )
+            if isinstance(raw_safety_signals, list) and all(
+                isinstance(item, str) for item in raw_safety_signals
             ):
-                safety_signals = [
-                    str(item)
-                    for item in raw_safety_signals
-                ]
+                safety_signals = [str(item) for item in raw_safety_signals]
             if (
                 isinstance(code, str)
                 and isinstance(message, str)
@@ -356,9 +349,7 @@ def create_app() -> FastAPI:
         ) as span:
 
             try:
-                cooldown_decision = limiter.check_cooldown(
-                    rate_limit_identity
-                )
+                cooldown_decision = limiter.check_cooldown(rate_limit_identity)
             except RateLimitUnavailableError as exc:
                 update_span(
                     span,

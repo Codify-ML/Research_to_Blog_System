@@ -165,9 +165,7 @@ def process_job(job_id: str) -> dict[str, str]:
                     "guardrail_blocked_output": (
                         final_status == AgentStatus.ESCALATED
                     ),
-                    "guardrail_response": str(
-                        result.get("error_message", "")
-                    ),
+                    "guardrail_response": str(result.get("error_message", "")),
                 },
                 level=(
                     "WARNING"
@@ -179,8 +177,7 @@ def process_job(job_id: str) -> dict[str, str]:
         store.set_status(job_id=job_id, next_status=final_status)
 
         updates = {
-            key: value for key, value in result.items()
-            if key != "status"
+            key: value for key, value in result.items() if key != "status"
         }
         duration_ms = int((time.perf_counter() - started) * 1000)
         updates["processing_duration_ms"] = duration_ms

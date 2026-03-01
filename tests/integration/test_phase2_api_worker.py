@@ -43,8 +43,7 @@ def test_generate_policy_blocked_input_returns_422(client):
     assert payload["reason_codes"] == ["SAFETY_PROFANITY"]
     assert payload["safety_signals"]
     assert any(
-        signal.startswith("profanity:")
-        for signal in payload["safety_signals"]
+        signal.startswith("profanity:") for signal in payload["safety_signals"]
     )
 
 
@@ -61,8 +60,7 @@ def test_generate_hate_content_input_returns_422(client):
     assert payload["reason_codes"] == ["SAFETY_HATE_CONTENT"]
     assert payload["safety_signals"]
     assert any(
-        signal.startswith("hate:")
-        for signal in payload["safety_signals"]
+        signal.startswith("hate:") for signal in payload["safety_signals"]
     )
 
 
@@ -88,8 +86,7 @@ def test_generate_sensitive_data_input_returns_422(client):
         "/generate",
         json={
             "topic": (
-                "Here is a leaked key: "
-                "sk-1234567890ABCDEFGHIJKLMNOPQRST."
+                "Here is a leaked key: " "sk-1234567890ABCDEFGHIJKLMNOPQRST."
             )
         },
     )

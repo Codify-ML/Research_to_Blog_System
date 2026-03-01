@@ -207,8 +207,7 @@ def _render_editorial_section(st, payload: StatusPayload) -> None:
                 st.write(f"- {item}")
         else:
             st.write(
-                "No required actions. "
-                "Draft may already satisfy criteria."
+                "No required actions. " "Draft may already satisfy criteria."
             )
 
 

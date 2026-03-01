@@ -93,8 +93,7 @@ class RateLimitService:
             blocked=True,
             code="ABUSE_COOLDOWN",
             message=(
-                "Input policy abuse cooldown is active. "
-                "Please retry later."
+                "Input policy abuse cooldown is active. " "Please retry later."
             ),
             retry_after_seconds=ttl,
         )

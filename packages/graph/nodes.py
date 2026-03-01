@@ -251,9 +251,7 @@ def make_writer_node(
             }
             update_span(
                 span,
-                output_payload=_as_observability_payload(
-                    {"draft": draft}
-                ),
+                output_payload=_as_observability_payload({"draft": draft}),
                 metadata={"draft_char_count": len(draft)},
             )
             return output

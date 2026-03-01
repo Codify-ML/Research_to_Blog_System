@@ -118,9 +118,7 @@ def _safe_end(span: Any) -> None:
 
 def _clean_kwargs(raw_kwargs: dict[str, Any]) -> dict[str, Any]:
     return {
-        key: value
-        for key, value in raw_kwargs.items()
-        if value is not None
+        key: value for key, value in raw_kwargs.items() if value is not None
     }
 
 

@@ -81,10 +81,7 @@ _SENSITIVE_DATA_PATTERNS = (
         re.IGNORECASE,
     ),
     re.compile(
-        (
-            r"\b(api[_\s-]?key|password|secret|token)\b"
-            r"\s*[:=]\s*[^\s]{8,}"
-        ),
+        (r"\b(api[_\s-]?key|password|secret|token)\b" r"\s*[:=]\s*[^\s]{8,}"),
         re.IGNORECASE,
     ),
 )
@@ -214,21 +211,14 @@ class SafetyService:
         if self.settings.safety_profanity_enabled and profanity_signals:
             reason_codes.append("SAFETY_PROFANITY")
             signals.extend(
-                f"profanity:{signal}"
-                for signal in profanity_signals
+                f"profanity:{signal}" for signal in profanity_signals
             )
         hate_signals = _hate_content_signals(candidate)
-        if (
-            self.settings.safety_hate_content_enabled
-            and hate_signals
-        ):
+        if self.settings.safety_hate_content_enabled and hate_signals:
             reason_codes.append("SAFETY_HATE_CONTENT")
-            signals.extend(
-                f"hate:{signal}"
-                for signal in hate_signals
-            )
-        prompt_injection_signals = (
-            _prompt_injection_or_exfiltration_signals(candidate)
+            signals.extend(f"hate:{signal}" for signal in hate_signals)
+        prompt_injection_signals = _prompt_injection_or_exfiltration_signals(
+            candidate
         )
         if (
             self.settings.safety_prompt_injection_enabled
@@ -246,15 +236,13 @@ class SafetyService:
         ):
             reason_codes.append("SAFETY_SENSITIVE_DATA")
             signals.extend(
-                f"sensitive_data:{signal}"
-                for signal in sensitive_data_signals
+                f"sensitive_data:{signal}" for signal in sensitive_data_signals
             )
 
         moderation_codes = self._moderation_reason_codes(candidate)
         reason_codes.extend(moderation_codes)
         signals.extend(
-            f"moderation:{code.lower()}"
-            for code in moderation_codes
+            f"moderation:{code.lower()}" for code in moderation_codes
         )
         if reason_codes:
             return SafetyDecision.block(
@@ -343,9 +331,7 @@ def _profanity_signals(text: str) -> list[str]:
                 }
                 # Avoid substring false positives (e.g. "intuit"):
                 # only accept exact token intersections.
-                signals.extend(
-                    sorted(token_set.intersection(censor_word_set))
-                )
+                signals.extend(sorted(token_set.intersection(censor_word_set)))
         except Exception:  # pragma: no cover - defensive
             pass
 
@@ -419,10 +405,7 @@ def _sensitive_data_signals(text: str) -> list[str]:
 
 def _categories_bool_map(raw_categories: object) -> dict[str, bool]:
     raw = _dump_model_or_dict(raw_categories)
-    return {
-        str(key): bool(value)
-        for key, value in raw.items()
-    }
+    return {str(key): bool(value) for key, value in raw.items()}
 
 
 def _categories_float_map(raw_scores: object) -> dict[str, float]:

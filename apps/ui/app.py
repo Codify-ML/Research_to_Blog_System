@@ -133,14 +133,13 @@ def _classify_ui_error(
         )
         reasons_text = ""
         if reason_codes:
-            reasons_text = (
-                "\n\nSignals: " + ", ".join(sorted(set(reason_codes)))
+            reasons_text = "\n\nSignals: " + ", ".join(
+                sorted(set(reason_codes))
             )
         evidence_text = ""
         if safety_signals:
-            evidence_text = (
-                "\n\nMatched terms/patterns: "
-                + ", ".join(safety_signals)
+            evidence_text = "\n\nMatched terms/patterns: " + ", ".join(
+                safety_signals
             )
         return (
             "warning",
@@ -363,7 +362,8 @@ def _render_execution_panel(
     last_job = st.session_state.get("execution_view_last_job")
     last_terminal = st.session_state.get("execution_view_last_terminal")
     if (
-        last_job != job_id or last_terminal is None
+        last_job != job_id
+        or last_terminal is None
         or bool(last_terminal) != current_terminal
     ):
         st.session_state[view_key] = desired_view
@@ -570,18 +570,12 @@ def main() -> None:
                     else None
                 ),
                 reason_codes=(
-                    [
-                        str(item)
-                        for item in ui_error["reason_codes"]
-                    ]
+                    [str(item) for item in ui_error["reason_codes"]]
                     if isinstance(ui_error.get("reason_codes"), list)
                     else None
                 ),
                 safety_signals=(
-                    [
-                        str(item)
-                        for item in ui_error["safety_signals"]
-                    ]
+                    [str(item) for item in ui_error["safety_signals"]]
                     if isinstance(
                         ui_error.get("safety_signals"),
                         list,
