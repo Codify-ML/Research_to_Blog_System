@@ -84,6 +84,12 @@ jobs:
       CLOUD_ENV: ${{ vars.CLOUD_ENV }}
       TF_WORKDIR: ${{ vars.TF_WORKDIR }}
       IMAGE_PLATFORM: ${{ vars.IMAGE_PLATFORM }}
+      TF_VAR_langfuse_enabled: ${{ vars.TF_VAR_langfuse_enabled }}
+      TF_VAR_langfuse_host: ${{ vars.TF_VAR_langfuse_host }}
+      TF_VAR_langfuse_environment: ${{ vars.TF_VAR_langfuse_environment }}
+      TF_VAR_langfuse_sample_rate: ${{ vars.TF_VAR_langfuse_sample_rate }}
+      TF_VAR_langfuse_capture_content: ${{ vars.TF_VAR_langfuse_capture_content }}
+      TF_VAR_langfuse_trace_health_endpoints: ${{ vars.TF_VAR_langfuse_trace_health_endpoints }}
       ENABLE_FEATURE_DEPLOY: ${{ vars.ENABLE_FEATURE_DEPLOY }}
       FEATURE_DEPLOY_REF: ${{ vars.FEATURE_DEPLOY_REF }}
       API_AUTH_KEY: ${{ secrets.API_AUTH_KEY }}
@@ -165,6 +171,21 @@ jobs:
           if [ -n "$cloud_env" ] && [ "$selected" != "$cloud_env" ]; then
             echo "Mismatch: workflow environment=$selected but CLOUD_ENV=$cloud_env"
             exit 1
+          fi
+
+      - name: Validate Langfuse deploy inputs
+        run: |
+          set -euo pipefail
+          lf_enabled="${TF_VAR_langfuse_enabled:-false}"
+          if [ "$lf_enabled" = "true" ]; then
+            if [ -z "${TF_VAR_langfuse_host:-}" ]; then
+              echo "TF_VAR_langfuse_host is required when TF_VAR_langfuse_enabled=true"
+              exit 1
+            fi
+            if [ -z "${LANGFUSE_PUBLIC_KEY:-}" ] || [ -z "${LANGFUSE_SECRET_KEY:-}" ]; then
+              echo "LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY secrets are required when TF_VAR_langfuse_enabled=true"
+              exit 1
+            fi
           fi
 
       - name: Configure AWS credentials
