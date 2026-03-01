@@ -10,7 +10,6 @@ import urllib.error
 import urllib.request
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 
 SERVICES = ("api", "worker", "ui")
@@ -113,15 +112,14 @@ def _repo_root() -> Path:
 
 
 def _default_tag() -> str:
-    stamp = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
-    short_sha = "manual"
+    short_sha = "latest"
     try:
         short_sha = _run(
             ["git", "rev-parse", "--short=12", "HEAD"], capture=True
         )
     except Exception:
         pass
-    return f"{stamp}-{short_sha}"
+    return short_sha
 
 
 def _parse_services(raw: str) -> tuple[str, ...]:
@@ -180,6 +178,20 @@ def _build_tf_env(config: ReleaseConfig) -> dict[str, str]:
         )
         if candidate:
             env["TF_VAR_openai_api_key"] = candidate
+
+    if not env.get("TF_VAR_langfuse_public_key"):
+        candidate = env.get("LANGFUSE_PUBLIC_KEY") or _dotenv_lookup(
+            "LANGFUSE_PUBLIC_KEY"
+        )
+        if candidate:
+            env["TF_VAR_langfuse_public_key"] = candidate
+
+    if not env.get("TF_VAR_langfuse_secret_key"):
+        candidate = env.get("LANGFUSE_SECRET_KEY") or _dotenv_lookup(
+            "LANGFUSE_SECRET_KEY"
+        )
+        if candidate:
+            env["TF_VAR_langfuse_secret_key"] = candidate
 
     return env
 

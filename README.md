@@ -168,7 +168,31 @@ Standard error behavior is implemented for:
 - queue unavailable (`503`)
 - unexpected failures (`500` with traceable metadata)
 
+Operational endpoints:
+- `GET /health` for liveness.
+- `GET /ready` and `GET /readiness` (alias) for readiness checks.
+
 ## Cloud Deployment (AWS)
+Recommended bootstrap path:
+1. Copy and fill the bootstrap config:
+```bash
+cp ops/dev.bootstrap.env.example ops/dev.bootstrap.env
+```
+2. Preview actions:
+```bash
+make bootstrap-dev-dry-run
+```
+3. Sync AWS Secrets Manager, GitHub environment values, and tfvars:
+```bash
+make bootstrap-dev
+```
+4. Plan or apply both stacks (`observability-dev` then `dev`):
+```bash
+make bootstrap-dev-plan
+make bootstrap-dev-apply
+```
+
+Manual fallback:
 1. Bootstrap variables:
 ```bash
 cp infra/terraform/envs/dev/terraform.tfvars.example \
@@ -180,6 +204,10 @@ make tf-init-dev
 make tf-validate-dev
 make tf-plan-dev
 ```
+`tf-plan-dev` and `tf-apply-dev` pass `-var=image_tag=$(IMAGE_TAG)`. By
+default, `IMAGE_TAG` resolves to the current git commit SHA (12 chars), with
+`latest` only as a fallback if git metadata is unavailable.
+
 3. Optional manual apply:
 ```bash
 make tf-apply-dev
@@ -187,10 +215,13 @@ make tf-apply-dev
 
 Image/deploy workflow via Makefile wrappers:
 ```bash
-IMAGE_TAG=$(git rev-parse --short HEAD) make image-build-dev
-IMAGE_TAG=$(git rev-parse --short HEAD) make image-push-dev
-IMAGE_TAG=$(git rev-parse --short HEAD) make deploy-plan-dev
-IMAGE_TAG=$(git rev-parse --short HEAD) make deploy-dev
+# IMAGE_TAG defaults to current git commit SHA (12 chars) for CI parity.
+# Override IMAGE_TAG only when you intentionally deploy a different tag.
+make image-build-dev
+make image-push-dev
+make deploy-plan-dev
+make deploy-dev
+make cloud-smoke
 ```
 
 See:
@@ -219,6 +250,8 @@ Validation guide:
 - Use `.env.example` as template only.
 - Cloud secrets (OpenAI key, API auth key, DB credentials) should come from
   AWS Secrets Manager.
+- Use `ops/dev.bootstrap.env` + `make bootstrap-dev` for repeatable secret and
+  environment provisioning.
 - Rotate API shared key with:
 ```bash
 make rotate-api-auth-key-dev
