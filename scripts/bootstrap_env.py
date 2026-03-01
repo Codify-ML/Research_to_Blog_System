@@ -254,7 +254,11 @@ def _validate_langfuse_key_format(public_key: str, secret_key: str) -> None:
 
 
 def _resolve_langfuse_project_keys(
-    cfg: BootstrapConfig, app_prefix: str, langfuse_prefix: str
+    cfg: BootstrapConfig,
+    app_prefix: str,
+    langfuse_prefix: str,
+    *,
+    allow_generate: bool = True,
 ) -> tuple[str, str]:
     public_key = cfg.get("LANGFUSE_PUBLIC_KEY", "")
     secret_key = cfg.get("LANGFUSE_SECRET_KEY", "")
@@ -278,9 +282,19 @@ def _resolve_langfuse_project_keys(
         )
 
     if not public_key:
+        if not allow_generate:
+            raise BootstrapError(
+                "Unable to resolve LANGFUSE_PUBLIC_KEY from config or AWS "
+                "Secrets Manager."
+            )
         public_key = f"lf_pk_{secrets.token_hex(16)}"
         print("~ generated LANGFUSE_PUBLIC_KEY")
     if not secret_key:
+        if not allow_generate:
+            raise BootstrapError(
+                "Unable to resolve LANGFUSE_SECRET_KEY from config or AWS "
+                "Secrets Manager."
+            )
         secret_key = f"lf_sk_{secrets.token_hex(32)}"
         print("~ generated LANGFUSE_SECRET_KEY")
 
@@ -509,7 +523,7 @@ def _sync_aws_secrets(cfg: BootstrapConfig) -> None:
         ),
     )
     langfuse_public_key, langfuse_secret_key = _resolve_langfuse_project_keys(
-        cfg, app_prefix, langfuse_prefix
+        cfg, app_prefix, langfuse_prefix, allow_generate=True
     )
 
     pairs = {
@@ -590,13 +604,48 @@ def _sync_github(cfg: BootstrapConfig) -> None:
             )
 
     tf_workdir = cfg.get("TF_WORKDIR", "infra/terraform/envs/dev")
+    project = cfg.get("PROJECT_NAME", "vc-blog-agent")
+    env_name_for_prefix = cfg.get("CLOUD_ENV", "dev")
+    app_prefix = f"{project}/{env_name_for_prefix}"
+    langfuse_prefix = f"{app_prefix}/langfuse"
+    langfuse_public_key, langfuse_secret_key = _resolve_langfuse_project_keys(
+        cfg,
+        app_prefix,
+        langfuse_prefix,
+        allow_generate=False,
+    )
+
     variables = {
         "AWS_REGION": cfg.get("AWS_REGION", "us-west-2"),
         "AWS_ACCOUNT_ID": account_id,
-        "PROJECT_NAME": cfg.get("PROJECT_NAME", "vc-blog-agent"),
-        "CLOUD_ENV": cfg.get("CLOUD_ENV", "dev"),
+        "PROJECT_NAME": project,
+        "CLOUD_ENV": env_name_for_prefix,
         "TF_WORKDIR": tf_workdir,
         "IMAGE_PLATFORM": cfg.get("IMAGE_PLATFORM", "linux/amd64"),
+        "TF_VAR_langfuse_enabled": (
+            "true" if cfg.get_bool("APP_LANGFUSE_ENABLED", True) else "false"
+        ),
+        "TF_VAR_langfuse_host": cfg.get(
+            "APP_LANGFUSE_HOST",
+            "https://langfuse.blog-agent.dev.vc-projects-ds.com",
+        ),
+        "TF_VAR_langfuse_environment": cfg.get(
+            "APP_LANGFUSE_ENVIRONMENT",
+            env_name_for_prefix,
+        ),
+        "TF_VAR_langfuse_sample_rate": str(
+            cfg.get_float("APP_LANGFUSE_SAMPLE_RATE", 1.0)
+        ),
+        "TF_VAR_langfuse_capture_content": (
+            "true"
+            if cfg.get_bool("APP_LANGFUSE_CAPTURE_CONTENT", False)
+            else "false"
+        ),
+        "TF_VAR_langfuse_trace_health_endpoints": (
+            "true"
+            if cfg.get_bool("APP_LANGFUSE_TRACE_HEALTH_ENDPOINTS", False)
+            else "false"
+        ),
     }
     for key, value in variables.items():
         _set_gh_variable(
@@ -610,6 +659,8 @@ def _sync_github(cfg: BootstrapConfig) -> None:
     secret_pairs = {
         "OPENAI_API_KEY": cfg.get("OPENAI_API_KEY"),
         "API_AUTH_KEY": cfg.get("API_AUTH_KEY"),
+        "LANGFUSE_PUBLIC_KEY": langfuse_public_key,
+        "LANGFUSE_SECRET_KEY": langfuse_secret_key,
         "AWS_ROLE_TO_ASSUME": cfg.get("AWS_ROLE_TO_ASSUME"),
     }
     for key, value in secret_pairs.items():
