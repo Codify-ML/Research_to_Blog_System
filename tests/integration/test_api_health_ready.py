@@ -16,3 +16,11 @@ def test_ready_contract(client) -> None:
     payload = response.json()
     assert payload["status"] == "ready"
     assert isinstance(payload["checks"], dict)
+
+
+def test_readiness_contract(client) -> None:
+    response = client.get("/readiness")
+    assert response.status_code == status.HTTP_200_OK
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert isinstance(payload["checks"], dict)

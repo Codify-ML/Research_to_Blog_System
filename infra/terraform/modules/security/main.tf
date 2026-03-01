@@ -13,7 +13,17 @@ locals {
   task_secret_arns = compact([
     var.openai_secret_arn,
     var.api_auth_secret_arn,
+    var.langfuse_public_key_secret_arn,
+    var.langfuse_secret_key_secret_arn,
   ])
+  db_ingress_source_sg_ids = toset(concat(
+    [aws_security_group.api.id, aws_security_group.worker.id],
+    var.additional_db_ingress_sg_ids,
+  ))
+  redis_ingress_source_sg_ids = toset(concat(
+    [aws_security_group.api.id, aws_security_group.worker.id],
+    var.additional_redis_ingress_sg_ids,
+  ))
 }
 
 resource "aws_security_group" "alb_api" {
@@ -135,13 +145,6 @@ resource "aws_security_group" "db" {
   description = "Postgres security group"
   vpc_id      = var.vpc_id
 
-  ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
-    security_groups = [aws_security_group.api.id, aws_security_group.worker.id]
-  }
-
   egress {
     from_port   = 0
     to_port     = 0
@@ -155,19 +158,34 @@ resource "aws_security_group" "redis" {
   description = "Redis security group"
   vpc_id      = var.vpc_id
 
-  ingress {
-    from_port       = 6379
-    to_port         = 6379
-    protocol        = "tcp"
-    security_groups = [aws_security_group.api.id, aws_security_group.worker.id]
-  }
-
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
+
+resource "aws_security_group_rule" "db_ingress" {
+  for_each = local.db_ingress_source_sg_ids
+
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.db.id
+  source_security_group_id = each.value
+}
+
+resource "aws_security_group_rule" "redis_ingress" {
+  for_each = local.redis_ingress_source_sg_ids
+
+  type                     = "ingress"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.redis.id
+  source_security_group_id = each.value
 }
 
 resource "aws_iam_role" "task_execution" {

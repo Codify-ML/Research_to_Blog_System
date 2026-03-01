@@ -191,6 +191,18 @@ variable "redis_node_type" {
   default     = "cache.t4g.micro"
 }
 
+variable "redis_parameter_group_family" {
+  description = "Redis parameter group family for ElastiCache."
+  type        = string
+  default     = "redis7"
+}
+
+variable "redis_maxmemory_policy" {
+  description = "Redis maxmemory eviction policy."
+  type        = string
+  default     = "noeviction"
+}
+
 variable "openai_api_key" {
   description = "Optional initial OpenAI key to write to Secrets Manager."
   type        = string
@@ -210,6 +222,20 @@ variable "api_auth_key" {
     )
     error_message = "api_auth_key must be provided when api_auth_enabled is true."
   }
+}
+
+variable "langfuse_public_key" {
+  description = "Optional initial Langfuse public key in Secrets Manager."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "langfuse_secret_key" {
+  description = "Optional initial Langfuse secret key in Secrets Manager."
+  type        = string
+  default     = ""
+  sensitive   = true
 }
 
 variable "waf_rate_limit" {
@@ -360,4 +386,48 @@ variable "rate_limit_fail_open" {
   description = "Allow requests if Redis rate-limit backend is unavailable."
   type        = bool
   default     = true
+}
+
+variable "langfuse_enabled" {
+  description = "Enable Langfuse tracing in API and worker."
+  type        = bool
+  default     = false
+}
+
+variable "langfuse_host" {
+  description = "Langfuse host URL for app tracing."
+  type        = string
+  default     = ""
+
+  validation {
+    condition = (
+      !var.langfuse_enabled
+      || trimspace(var.langfuse_host) != ""
+    )
+    error_message = "langfuse_host must be provided when tracing is enabled."
+  }
+}
+
+variable "langfuse_environment" {
+  description = "Langfuse environment label for traces."
+  type        = string
+  default     = "dev"
+}
+
+variable "langfuse_sample_rate" {
+  description = "Langfuse trace sampling rate."
+  type        = number
+  default     = 1.0
+}
+
+variable "langfuse_capture_content" {
+  description = "Capture trace input/output content in Langfuse."
+  type        = bool
+  default     = false
+}
+
+variable "langfuse_trace_health_endpoints" {
+  description = "Capture /health traces in Langfuse."
+  type        = bool
+  default     = false
 }

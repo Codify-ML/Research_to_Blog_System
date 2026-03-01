@@ -187,6 +187,33 @@ def _readiness_payload() -> tuple[dict[str, object], int]:
     return payload, status_code
 
 
+def _readiness_response(*, endpoint_path: str) -> JSONResponse:
+    settings = get_settings()
+    observability = get_observability(settings)
+    started = time.perf_counter()
+    payload, status_code = _readiness_payload()
+    if not settings.langfuse_trace_health_endpoints:
+        return JSONResponse(status_code=status_code, content=payload)
+
+    with observability.span(
+        name="api.readiness",
+        metadata={"endpoint": endpoint_path},
+    ) as span:
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        update_span(
+            span,
+            output_payload=_as_observability_payload(payload),
+            metadata={
+                "duration_ms": duration_ms,
+                "status": str(payload["status"]),
+                "http_status": status_code,
+            },
+            level="ERROR" if status_code >= 500 else None,
+        )
+        observability.flush()
+        return JSONResponse(status_code=status_code, content=payload)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Research to Blog API", version="0.2.0")
 
@@ -292,31 +319,9 @@ def create_app() -> FastAPI:
             return payload
 
     @app.get("/ready")
-    def ready() -> JSONResponse:
-        settings = get_settings()
-        observability = get_observability(settings)
-        started = time.perf_counter()
-        payload, status_code = _readiness_payload()
-        if not settings.langfuse_trace_health_endpoints:
-            return JSONResponse(status_code=status_code, content=payload)
-
-        with observability.span(
-            name="api.ready",
-            metadata={"endpoint": "/ready"},
-        ) as span:
-            duration_ms = int((time.perf_counter() - started) * 1000)
-            update_span(
-                span,
-                output_payload=_as_observability_payload(payload),
-                metadata={
-                    "duration_ms": duration_ms,
-                    "status": str(payload["status"]),
-                    "http_status": status_code,
-                },
-                level="ERROR" if status_code >= 500 else None,
-            )
-            observability.flush()
-            return JSONResponse(status_code=status_code, content=payload)
+    @app.get("/readiness")
+    def readiness(request: Request) -> JSONResponse:
+        return _readiness_response(endpoint_path=request.url.path)
 
     @app.post("/generate", response_model=GenerateResponse)
     def generate(

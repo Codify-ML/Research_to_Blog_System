@@ -45,3 +45,15 @@ variable "redis_node_type" {
   type        = string
   default     = "cache.t4g.micro"
 }
+
+variable "redis_parameter_group_family" {
+  description = "Redis parameter group family."
+  type        = string
+  default     = "redis7"
+}
+
+variable "redis_maxmemory_policy" {
+  description = "Redis maxmemory eviction policy."
+  type        = string
+  default     = "noeviction"
+}
