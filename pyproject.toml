@@ -9,6 +9,7 @@ dependencies = [
   "celery>=5.4.0",
   "fastapi>=0.115.0",
   "kombu>=5.4.0",
+  "langfuse>=3.4.0",
   "langgraph>=0.2.50",
   "openai>=1.54.0",
   "psycopg[binary]>=3.2.0",

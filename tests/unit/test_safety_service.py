@@ -20,10 +20,7 @@ def test_profanity_prefilter_blocks_input() -> None:
 
     assert decision.blocked is True
     assert "SAFETY_PROFANITY" in decision.reason_codes
-    assert any(
-        signal.startswith("profanity:")
-        for signal in decision.signals
-    )
+    assert any(signal.startswith("profanity:") for signal in decision.signals)
 
 
 def test_hate_prefilter_blocks_racism_content() -> None:

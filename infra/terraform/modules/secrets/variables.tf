@@ -16,3 +16,17 @@ variable "api_auth_key" {
   default     = ""
   sensitive   = true
 }
+
+variable "langfuse_public_key" {
+  description = "Optional initial Langfuse public key secret value."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "langfuse_secret_key" {
+  description = "Optional initial Langfuse secret key secret value."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

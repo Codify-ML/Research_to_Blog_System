@@ -16,6 +16,22 @@ locals {
     name      = "API_AUTH_KEY"
     valueFrom = var.api_auth_secret_arn
   }] : []
+  langfuse_public_key_secret = (
+    var.langfuse_public_key_secret_arn != ""
+    ? [{
+      name      = "LANGFUSE_PUBLIC_KEY"
+      valueFrom = var.langfuse_public_key_secret_arn
+    }]
+    : []
+  )
+  langfuse_secret_key_secret = (
+    var.langfuse_secret_key_secret_arn != ""
+    ? [{
+      name      = "LANGFUSE_SECRET_KEY"
+      valueFrom = var.langfuse_secret_key_secret_arn
+    }]
+    : []
+  )
   db_password_secret = var.db_secret_arn != "" ? [{
     name      = "DB_PASSWORD"
     valueFrom = "${var.db_secret_arn}:password::"
@@ -65,6 +81,27 @@ locals {
     {
       name  = "RATE_LIMIT_FAIL_OPEN"
       value = tostring(var.rate_limit_fail_open)
+    },
+    {
+      name  = "LANGFUSE_ENABLED"
+      value = tostring(var.langfuse_enabled)
+    },
+    { name = "LANGFUSE_HOST", value = var.langfuse_host },
+    {
+      name  = "LANGFUSE_ENVIRONMENT"
+      value = var.langfuse_environment
+    },
+    {
+      name  = "LANGFUSE_SAMPLE_RATE"
+      value = tostring(var.langfuse_sample_rate)
+    },
+    {
+      name  = "LANGFUSE_CAPTURE_CONTENT"
+      value = tostring(var.langfuse_capture_content)
+    },
+    {
+      name  = "LANGFUSE_TRACE_HEALTH_ENDPOINTS"
+      value = tostring(var.langfuse_trace_health_endpoints)
     },
     { name = "JOB_STORE_BACKEND", value = "postgres" },
     { name = "REDIS_URL", value = "${local.redis_base_url}/0" },
@@ -349,6 +386,8 @@ resource "aws_ecs_task_definition" "api" {
       secrets = concat(
         local.openai_secret,
         local.api_auth_secret,
+        local.langfuse_public_key_secret,
+        local.langfuse_secret_key_secret,
         local.db_password_secret,
       )
       logConfiguration = {
@@ -381,6 +420,8 @@ resource "aws_ecs_task_definition" "worker" {
       secrets = concat(
         local.openai_secret,
         local.api_auth_secret,
+        local.langfuse_public_key_secret,
+        local.langfuse_secret_key_secret,
         local.db_password_secret,
       )
       logConfiguration = {

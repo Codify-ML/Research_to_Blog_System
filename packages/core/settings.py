@@ -46,6 +46,18 @@ class Settings(BaseSettings):
     abuse_violation_threshold: int = Field(default=5, ge=1)
     abuse_cooldown_seconds: int = Field(default=900, ge=1)
     rate_limit_fail_open: bool = True
+    langfuse_enabled: bool = False
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str | None = None
+    langfuse_environment: str = "local"
+    langfuse_sample_rate: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+    )
+    langfuse_capture_content: bool = False
+    langfuse_trace_health_endpoints: bool = True
 
     redis_url: str = "redis://localhost:6379/0"
     database_url: str | None = None
@@ -76,6 +88,20 @@ class Settings(BaseSettings):
         if self.api_auth_enabled and not self.api_auth_key:
             raise ValueError(
                 "API_AUTH_KEY is required when API_AUTH_ENABLED is true."
+            )
+        if self.langfuse_enabled and not self.langfuse_public_key:
+            raise ValueError(
+                "LANGFUSE_PUBLIC_KEY is required when "
+                "LANGFUSE_ENABLED is true."
+            )
+        if self.langfuse_enabled and not self.langfuse_secret_key:
+            raise ValueError(
+                "LANGFUSE_SECRET_KEY is required when "
+                "LANGFUSE_ENABLED is true."
+            )
+        if self.langfuse_enabled and not self.langfuse_host:
+            raise ValueError(
+                "LANGFUSE_HOST is required when LANGFUSE_ENABLED is true."
             )
         if self.job_store_backend == "postgres":
             _ = self.resolved_database_url

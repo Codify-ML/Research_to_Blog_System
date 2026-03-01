@@ -1,6 +1,11 @@
 locals {
-  name_prefix            = "${var.project_name}-${var.environment}"
-  secret_prefix          = "${var.project_name}/${var.environment}"
+  name_prefix   = "${var.project_name}-${var.environment}"
+  secret_prefix = "${var.project_name}/${var.environment}"
+  canonical_app_dns_prefix = (
+    startswith(trimspace(var.project_name), "vc-")
+    ? trimprefix(trimspace(var.project_name), "vc-")
+    : trimspace(var.project_name)
+  )
   route53_zone_name_base = trimsuffix(trimspace(var.route53_zone_name), ".")
   default_api_hostname   = "${trimspace(var.api_dns_label)}.${trimspace(var.app_dns_prefix)}.${local.route53_zone_name_base}"
   default_ui_hostname    = "${trimspace(var.ui_dns_label)}.${trimspace(var.app_dns_prefix)}.${local.route53_zone_name_base}"
@@ -39,6 +44,15 @@ check "api_ui_hostnames_distinct" {
   }
 }
 
+check "app_dns_prefix_convention" {
+  assert {
+    condition = (
+      trimspace(var.app_dns_prefix) == local.canonical_app_dns_prefix
+    )
+    error_message = "app_dns_prefix must follow project_name naming convention (e.g. vc-blog-agent -> blog-agent)."
+  }
+}
+
 module "network" {
   source = "../../modules/network"
 
@@ -51,9 +65,11 @@ module "network" {
 module "secrets" {
   source = "../../modules/secrets"
 
-  name_prefix    = local.secret_prefix
-  openai_api_key = var.openai_api_key
-  api_auth_key   = var.api_auth_key
+  name_prefix         = local.secret_prefix
+  openai_api_key      = var.openai_api_key
+  api_auth_key        = var.api_auth_key
+  langfuse_public_key = var.langfuse_public_key
+  langfuse_secret_key = var.langfuse_secret_key
 }
 
 module "ecr" {
@@ -140,6 +156,12 @@ module "security" {
   vpc_id              = module.network.vpc_id
   openai_secret_arn   = module.secrets.openai_secret_arn
   api_auth_secret_arn = module.secrets.api_auth_secret_arn
+  langfuse_public_key_secret_arn = (
+    module.secrets.langfuse_public_key_secret_arn
+  )
+  langfuse_secret_key_secret_arn = (
+    module.secrets.langfuse_secret_key_secret_arn
+  )
 }
 
 module "data" {
@@ -154,6 +176,10 @@ module "data" {
   db_instance_class    = var.db_instance_class
   db_allocated_storage = var.db_allocated_storage
   redis_node_type      = var.redis_node_type
+  redis_parameter_group_family = (
+    var.redis_parameter_group_family
+  )
+  redis_maxmemory_policy = var.redis_maxmemory_policy
 }
 
 resource "aws_iam_role_policy" "task_db_secret" {
@@ -220,6 +246,12 @@ module "compute" {
   redis_port              = module.data.redis_port
   openai_secret_arn       = module.secrets.openai_secret_arn
   api_auth_secret_arn     = module.secrets.api_auth_secret_arn
+  langfuse_public_key_secret_arn = (
+    module.secrets.langfuse_public_key_secret_arn
+  )
+  langfuse_secret_key_secret_arn = (
+    module.secrets.langfuse_secret_key_secret_arn
+  )
   api_image               = var.api_image != "" ? var.api_image : "${module.ecr.api_repository_url}:${var.image_tag}"
   worker_image            = var.worker_image != "" ? var.worker_image : "${module.ecr.worker_repository_url}:${var.image_tag}"
   ui_image                = var.ui_image != "" ? var.ui_image : "${module.ecr.ui_repository_url}:${var.image_tag}"
@@ -239,6 +271,14 @@ module "compute" {
   abuse_violation_threshold    = var.abuse_violation_threshold
   abuse_cooldown_seconds       = var.abuse_cooldown_seconds
   rate_limit_fail_open         = var.rate_limit_fail_open
+  langfuse_enabled             = var.langfuse_enabled
+  langfuse_host                = var.langfuse_host
+  langfuse_environment         = var.langfuse_environment
+  langfuse_sample_rate         = var.langfuse_sample_rate
+  langfuse_capture_content     = var.langfuse_capture_content
+  langfuse_trace_health_endpoints = (
+    var.langfuse_trace_health_endpoints
+  )
   api_desired_count       = var.api_desired_count
   worker_desired_count    = var.worker_desired_count
   ui_desired_count        = var.ui_desired_count

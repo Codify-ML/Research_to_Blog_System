@@ -93,8 +93,7 @@ class RateLimitService:
             blocked=True,
             code="ABUSE_COOLDOWN",
             message=(
-                "Input policy abuse cooldown is active. "
-                "Please retry later."
+                "Input policy abuse cooldown is active. " "Please retry later."
             ),
             retry_after_seconds=ttl,
         )
@@ -128,6 +127,14 @@ class RateLimitService:
                 retry_after_seconds=self.settings.abuse_cooldown_seconds,
             )
         return RateLimitDecision.allow()
+
+    def backend_available(self) -> bool:
+        if not self.settings.rate_limit_enabled:
+            return True
+        try:
+            return bool(self._client.ping())
+        except RedisError:
+            return False
 
     def _minute_bucket_key(self, scope: str, identity: str) -> str:
         bucket = int(time.time() // 60)

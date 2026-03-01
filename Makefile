@@ -15,19 +15,34 @@
 	deploy-plan-dev \
 	deploy-dev \
 	rotate-api-auth-key-dev \
+	check-image-tag-sync \
+	bootstrap-dev \
+	bootstrap-dev-dry-run \
+	bootstrap-dev-plan \
+	bootstrap-dev-apply \
 	tf-fmt \
 	tf-init-dev \
 	tf-validate-dev \
 	tf-plan-dev \
 	tf-apply-dev \
+	tf-init-obs-dev \
+	tf-validate-obs-dev \
+	tf-plan-obs-dev \
+	tf-apply-obs-dev \
 	tf-destroy-dev \
 	docker-up \
 	docker-down \
 	docker-logs \
 	docker-ps \
+	obs-up \
+	obs-down \
+	obs-logs \
+	obs-ps \
+	obs-smoke \
 	docker-smoke \
 	docker-smoke-db \
 	docker-smoke-openai \
+	cloud-smoke \
 	run-sync \
 	run-api \
 	run-worker \
@@ -58,7 +73,12 @@ WORKER_CMD_PATTERN := celery -A apps.worker.app.celery_app:celery_app worker -l 
 UI_CMD_PATTERN := streamlit run apps/ui/app.py --server.address 127.0.0.1 --server.port $(UI_PORT) --browser.gatherUsageStats false --server.headless true
 DOCKER_COMPOSE_FILE := docker-compose.local.yml
 DOCKER_COMPOSE := docker compose -f $(DOCKER_COMPOSE_FILE)
+OBS_COMPOSE_FILE := docker-compose.observability.yml
+OBS_ENV_FILE := .env.observability
+OBS_PROJECT_NAME ?= research_to_blog_system_obs
+OBS_DOCKER_COMPOSE := COMPOSE_PROJECT_NAME=$(OBS_PROJECT_NAME) docker compose --env-file $(OBS_ENV_FILE) -f $(OBS_COMPOSE_FILE)
 TF_DEV_DIR := infra/terraform/envs/dev
+TF_OBS_DEV_DIR := infra/terraform/envs/observability-dev
 
 # Cloud release defaults
 AWS_PROFILE ?= personal-aws-dev
@@ -67,10 +87,11 @@ AWS_REGION ?= us-west-2
 AWS_ACCOUNT_ID ?=
 PROJECT_NAME ?= vc-blog-agent
 CLOUD_ENV ?= dev
-IMAGE_TAG ?= latest
 IMAGE_PLATFORM ?= linux/amd64
 RELEASE_SERVICES ?= api,worker,ui
 SMOKE_LLM_MODE ?= mock
+# Align local release defaults with CI behavior (immutable commit tag).
+IMAGE_TAG ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo latest)
 RELEASE_CMD := uv run python scripts/release.py
 RELEASE_COMMON_ARGS := \
 	--aws-profile "$(AWS_PROFILE)" \
@@ -137,15 +158,51 @@ image-build-dev: ## Build API/worker/UI images for dev.
 image-push-dev: ## Build and push images to ECR.
 	$(RELEASE_CMD) build-push $(RELEASE_COMMON_ARGS)
 
-deploy-plan-dev: ## Run Terraform plan for current IMAGE_TAG.
+check-image-tag-sync: ## Guard IMAGE_TAG usage for deploy path consistency.
+	@tfvars_path="$(TF_DEV_DIR)/terraform.tfvars"; \
+	if [ ! -f "$$tfvars_path" ]; then \
+		echo "ERROR: $$tfvars_path not found."; \
+		exit 1; \
+	fi; \
+	tfvars_tag=$$(sed -nE 's/^[[:space:]]*image_tag[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$$tfvars_path" | head -n 1); \
+	if [ -z "$$tfvars_tag" ]; then \
+		echo "ERROR: image_tag is not set in $$tfvars_path."; \
+		exit 1; \
+	fi; \
+	if [ "$$tfvars_tag" = "latest" ]; then \
+		echo "note: $$tfvars_path uses image_tag=latest; deploy commands still use IMAGE_TAG=$(IMAGE_TAG) via -var override."; \
+		exit 0; \
+	fi; \
+	if [ "$(IMAGE_TAG)" != "$$tfvars_tag" ]; then \
+		echo "ERROR: IMAGE_TAG=$(IMAGE_TAG) does not match $$tfvars_path image_tag=$$tfvars_tag."; \
+		echo "Set IMAGE_TAG=$$tfvars_tag or update $$tfvars_path if this is intentional."; \
+		exit 1; \
+	fi
+
+deploy-plan-dev: check-image-tag-sync ## Run Terraform plan for current IMAGE_TAG.
 	$(RELEASE_CMD) plan $(RELEASE_COMMON_ARGS)
 
-deploy-dev: ## Build/push/apply/wait/smoke release flow.
+deploy-dev: check-image-tag-sync ## Build/push/apply/wait/smoke release flow.
 	$(RELEASE_CMD) deploy $(RELEASE_COMMON_ARGS) \
 		--smoke-llm-mode "$(SMOKE_LLM_MODE)"
 
 rotate-api-auth-key-dev: ## Rotate deployed API auth key in cloud.
 	@bash scripts/rotate_api_auth_key_dev.sh
+
+bootstrap-dev: ## Sync AWS/GitHub/tfvars from ops/dev.bootstrap.env.
+	uv run python scripts/bootstrap_env.py --config-file ops/dev.bootstrap.env
+
+bootstrap-dev-dry-run: ## Print bootstrap actions without applying changes.
+	uv run python scripts/bootstrap_env.py --dry-run \
+		--config-file ops/dev.bootstrap.env
+
+bootstrap-dev-plan: ## Bootstrap then run Terraform plan for obs+app stacks.
+	uv run python scripts/bootstrap_env.py --config-file ops/dev.bootstrap.env \
+		--terraform-plan
+
+bootstrap-dev-apply: ## Bootstrap then run Terraform apply for obs+app stacks.
+	uv run python scripts/bootstrap_env.py --config-file ops/dev.bootstrap.env \
+		--terraform-apply
 
 ##@ Terraform
 tf-fmt: ## Format Terraform files.
@@ -157,11 +214,24 @@ tf-init-dev: ## Initialize Terraform backend for dev.
 tf-validate-dev: ## Validate Terraform config for dev.
 	terraform -chdir=$(TF_DEV_DIR) validate
 
-tf-plan-dev: ## Plan Terraform changes for dev.
-	terraform -chdir=$(TF_DEV_DIR) plan -var-file=terraform.tfvars
+tf-plan-dev: ## Plan Terraform changes for dev (uses IMAGE_TAG override).
+	terraform -chdir=$(TF_DEV_DIR) plan -var-file=terraform.tfvars -var=image_tag=$(IMAGE_TAG)
 
-tf-apply-dev: ## Apply Terraform changes for dev.
-	terraform -chdir=$(TF_DEV_DIR) apply -var-file=terraform.tfvars
+tf-apply-dev: ## Apply Terraform changes for dev (uses IMAGE_TAG override).
+	terraform -chdir=$(TF_DEV_DIR) apply -var-file=terraform.tfvars -var=image_tag=$(IMAGE_TAG)
+
+tf-init-obs-dev: ## Initialize Terraform backend for observability dev.
+	terraform -chdir=$(TF_OBS_DEV_DIR) init -reconfigure \
+		-backend-config=backend.hcl
+
+tf-validate-obs-dev: ## Validate Terraform config for observability dev.
+	terraform -chdir=$(TF_OBS_DEV_DIR) validate
+
+tf-plan-obs-dev: ## Plan Terraform changes for observability dev.
+	terraform -chdir=$(TF_OBS_DEV_DIR) plan -var-file=terraform.tfvars
+
+tf-apply-obs-dev: ## Apply Terraform changes for observability dev.
+	terraform -chdir=$(TF_OBS_DEV_DIR) apply -var-file=terraform.tfvars
 
 tf-destroy-dev: ## Destroy Terraform resources for dev.
 	terraform -chdir=$(TF_DEV_DIR) destroy -var-file=terraform.tfvars
@@ -178,6 +248,27 @@ docker-logs: ## Tail local Docker stack logs.
 
 docker-ps: ## List local Docker stack service status.
 	$(DOCKER_COMPOSE) ps
+
+obs-up: ## Start separate Langfuse observability stack.
+	@if [ ! -f $(OBS_ENV_FILE) ]; then \
+		echo "Missing $(OBS_ENV_FILE)."; \
+		echo "Create it from .env.observability.example first."; \
+		exit 1; \
+	fi
+	$(OBS_DOCKER_COMPOSE) up -d
+
+obs-down: ## Stop separate Langfuse observability stack.
+	$(OBS_DOCKER_COMPOSE) down --remove-orphans
+
+obs-logs: ## Tail Langfuse observability stack logs.
+	$(OBS_DOCKER_COMPOSE) logs -f --tail=200
+
+obs-ps: ## List Langfuse observability stack service status.
+	$(OBS_DOCKER_COMPOSE) ps
+
+obs-smoke: ## Quick smoke check for local Langfuse web endpoint.
+	@curl -fsS http://127.0.0.1:3000 >/dev/null && \
+		echo "Langfuse web is reachable at http://127.0.0.1:3000"
 
 docker-smoke: ## Run API lifecycle smoke test against Docker stack.
 	@$(DOCKER_COMPOSE) exec -T api /bin/sh -lc '\
@@ -202,6 +293,44 @@ docker-smoke-db: ## Run smoke + direct Postgres persistence check.
 
 docker-smoke-openai: ## Run OpenAI-backed API smoke test in Docker.
 	@bash scripts/docker_smoke_openai_check.sh $(DOCKER_COMPOSE_FILE)
+
+cloud-smoke: ## Run health/readiness + lifecycle smoke test against deployed cloud API.
+	@if [ ! -f $(RUN_DIR)/cloud_api_auth_key.txt ]; then \
+		echo "Missing $(RUN_DIR)/cloud_api_auth_key.txt."; \
+		echo "Add the deployed API key there before running cloud-smoke."; \
+		exit 1; \
+	fi
+	@set -eu; \
+	api_key=$$(cat $(RUN_DIR)/cloud_api_auth_key.txt); \
+	base="$${CLOUD_API_BASE_URL:-https://api.blog-agent.dev.vc-projects-ds.com}"; \
+	echo "Checking $$base/health"; \
+	health=$$(curl -fsS "$$base/health" -H "x-api-key: $$api_key"); \
+	echo "$$health" | jq .; \
+	echo "Checking $$base/readiness"; \
+	ready=$$(curl -fsS "$$base/readiness" -H "x-api-key: $$api_key"); \
+	echo "$$ready" | jq .; \
+	topic="cloud_smoke_$$(date +%s)"; \
+	resp=$$(curl -fsS -X POST "$$base/generate" \
+		-H "content-type: application/json" \
+		-H "x-api-key: $$api_key" \
+		-d "{\"topic\":\"$$topic\",\"llm_mode\":\"mock\"}"); \
+	echo "$$resp" | jq .; \
+	job_id=$$(printf '%s' "$$resp" | python -c 'import json,sys; print(json.loads(sys.stdin.read(), strict=False)["job_id"])'); \
+	final_status=""; \
+	for i in $$(seq 1 60); do \
+		out=$$(curl -fsS "$$base/status/$$job_id" -H "x-api-key: $$api_key"); \
+		final_status=$$(printf '%s' "$$out" | python -c 'import json,sys; print(json.loads(sys.stdin.read(), strict=False).get("status",""))'); \
+		echo "$$final_status"; \
+		if [ "$$final_status" = "COMPLETED" ] || [ "$$final_status" = "FAILED" ] || [ "$$final_status" = "ESCALATED" ]; then \
+			printf '%s' "$$out" | python -c 'import json,sys; data=json.loads(sys.stdin.read(), strict=False); import json as _j; print(_j.dumps({k:data.get(k) for k in ("job_id","status","llm_mode","error_message","updated_at")}, indent=2))'; \
+			break; \
+		fi; \
+		sleep 2; \
+	done; \
+	if [ "$$final_status" != "COMPLETED" ] && [ "$$final_status" != "FAILED" ] && [ "$$final_status" != "ESCALATED" ]; then \
+		echo "cloud-smoke timed out waiting for terminal status"; \
+		exit 1; \
+	fi
 
 ##@ Runtime
 run-sync: ## Run synchronous graph harness.

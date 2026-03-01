@@ -23,6 +23,16 @@ output "api_auth_secret_arn" {
   value       = module.secrets.api_auth_secret_arn
 }
 
+output "langfuse_public_key_secret_arn" {
+  description = "Langfuse public key secret ARN in Secrets Manager."
+  value       = module.secrets.langfuse_public_key_secret_arn
+}
+
+output "langfuse_secret_key_secret_arn" {
+  description = "Langfuse secret key secret ARN in Secrets Manager."
+  value       = module.secrets.langfuse_secret_key_secret_arn
+}
+
 output "db_master_secret_arn" {
   description = "RDS-managed master user secret ARN in Secrets Manager."
   value       = module.data.db_master_secret_arn
@@ -51,4 +61,9 @@ output "cognito_user_pool_id" {
 output "cognito_user_pool_domain" {
   description = "Cognito hosted UI domain."
   value       = aws_cognito_user_pool_domain.ui.domain
+}
+
+output "cognito_user_pool_client_id" {
+  description = "Cognito user pool client ID for UI login."
+  value       = aws_cognito_user_pool_client.ui.id
 }

@@ -140,9 +140,7 @@ class ApiClient:
             error_message=payload.get("error_message"),
             created_at=str(payload.get("created_at", "")),
             updated_at=str(payload["updated_at"]),
-            status_transitions=list(
-                payload.get("status_transitions", [])
-            ),
+            status_transitions=list(payload.get("status_transitions", [])),
         )
 
     def _request(
@@ -193,23 +191,16 @@ class ApiClient:
         blocked_category = detail.get("blocked_category")
         raw_reason_codes = detail.get("reason_codes")
         reason_codes: list[str] | None = None
-        if (
-            isinstance(raw_reason_codes, list)
-            and all(isinstance(item, str) for item in raw_reason_codes)
+        if isinstance(raw_reason_codes, list) and all(
+            isinstance(item, str) for item in raw_reason_codes
         ):
             reason_codes = [str(item) for item in raw_reason_codes]
         raw_safety_signals = detail.get("safety_signals")
         safety_signals: list[str] | None = None
-        if (
-            isinstance(raw_safety_signals, list)
-            and all(
-                isinstance(item, str) for item in raw_safety_signals
-            )
+        if isinstance(raw_safety_signals, list) and all(
+            isinstance(item, str) for item in raw_safety_signals
         ):
-            safety_signals = [
-                str(item)
-                for item in raw_safety_signals
-            ]
+            safety_signals = [str(item) for item in raw_safety_signals]
         message = (
             detail.get("message") or response.text or "API request failed."
         )

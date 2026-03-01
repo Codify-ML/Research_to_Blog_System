@@ -15,6 +15,14 @@ This runbook validates CI behavior in:
   build/push/apply/wait/smoke.
 - Manual `workflow_dispatch` runs the selected action.
 
+Image tag behavior:
+- PR/non-main and main deploy paths resolve tags to `${GITHUB_SHA::12}`.
+- `workflow_dispatch` can override `image_tag`; if not provided, release
+  defaults apply.
+- Local parity commands (`make deploy-dev`, `make deploy-plan-dev`,
+  `make tf-plan-dev`, `make tf-apply-dev`) default `IMAGE_TAG` to the current
+  git commit SHA.
+
 ## Prerequisites
 - GitHub Environment `dev` exists.
 - Environment variables are set:
@@ -26,6 +34,8 @@ This runbook validates CI behavior in:
   `AWS_ROLE_TO_ASSUME`, `API_AUTH_KEY`, `OPENAI_API_KEY`.
 - Optional secret:
   `AWS_ROLE_EXTERNAL_ID`.
+  `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` (only if app tracing is
+  enabled).
 
 ## Test Matrix
 | Scenario | Trigger | Expected Action |

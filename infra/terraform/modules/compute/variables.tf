@@ -107,6 +107,18 @@ variable "api_auth_secret_arn" {
   default     = ""
 }
 
+variable "langfuse_public_key_secret_arn" {
+  description = "Optional Langfuse public key secret ARN for ECS secrets injection."
+  type        = string
+  default     = ""
+}
+
+variable "langfuse_secret_key_secret_arn" {
+  description = "Optional Langfuse secret key secret ARN for ECS secrets injection."
+  type        = string
+  default     = ""
+}
+
 variable "api_image" {
   description = "Container image for API service."
   type        = string
@@ -215,6 +227,42 @@ variable "rate_limit_fail_open" {
   description = "Allow requests if Redis rate-limit backend is unavailable."
   type        = bool
   default     = true
+}
+
+variable "langfuse_enabled" {
+  description = "Enable Langfuse tracing in API and worker services."
+  type        = bool
+  default     = false
+}
+
+variable "langfuse_host" {
+  description = "Langfuse host URL used by API and worker services."
+  type        = string
+  default     = ""
+}
+
+variable "langfuse_environment" {
+  description = "Langfuse environment label used for traces."
+  type        = string
+  default     = "dev"
+}
+
+variable "langfuse_sample_rate" {
+  description = "Langfuse trace sampling rate."
+  type        = number
+  default     = 1.0
+}
+
+variable "langfuse_capture_content" {
+  description = "Capture trace input/output content in Langfuse."
+  type        = bool
+  default     = false
+}
+
+variable "langfuse_trace_health_endpoints" {
+  description = "Capture /health endpoint traces in Langfuse."
+  type        = bool
+  default     = false
 }
 
 variable "api_desired_count" {

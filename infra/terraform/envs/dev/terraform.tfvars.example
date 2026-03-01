@@ -3,8 +3,12 @@
 
 aws_region = "us-west-2"
 aws_profile = "personal-aws-dev"
+project_name = "vc-blog-agent"
 route53_zone_name = "dev.vc-projects-ds.com"
 route53_zone_id = "Z03707592Y0NKCCWRSSFL"
+# Naming convention:
+# if project_name starts with "vc-", app_dns_prefix should be project_name
+# without that prefix (vc-blog-agent -> blog-agent).
 app_dns_prefix = "blog-agent"
 api_dns_label = "api"
 ui_dns_label = "ui"
@@ -26,6 +30,8 @@ ui_hostname = ""
 # secret and you can set the value manually afterward.
 openai_api_key = ""
 api_auth_key = ""
+langfuse_public_key = ""
+langfuse_secret_key = ""
 api_auth_enabled = false
 
 # If you set api_auth_enabled=true, also provide api_auth_key (or
@@ -34,6 +40,10 @@ api_auth_enabled = false
 # Network posture for cloud portability.
 enable_nat_gateway = true
 waf_rate_limit = 2000
+
+# Redis safety defaults.
+redis_parameter_group_family = "redis7"
+redis_maxmemory_policy = "noeviction"
 
 # ECS resiliency and rolling deployment safety.
 api_desired_count = 2
@@ -63,3 +73,11 @@ abuse_window_seconds = 600
 abuse_violation_threshold = 5
 abuse_cooldown_seconds = 900
 rate_limit_fail_open = true
+
+# Langfuse tracing (API/worker). Set keys as secret values above.
+langfuse_enabled = false
+langfuse_host = "https://langfuse.blog-agent.dev.vc-projects-ds.com"
+langfuse_environment = "dev"
+langfuse_sample_rate = 1.0
+langfuse_capture_content = false
+langfuse_trace_health_endpoints = false

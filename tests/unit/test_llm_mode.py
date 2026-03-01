@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import pytest
 from pydantic import ValidationError
 
@@ -55,3 +57,29 @@ def test_web_search_tool_fallback_variant() -> None:
     fallback = client._fallback_web_search_tools(tools)
     assert fallback is not None
     assert fallback[0]["type"] == "web_search_preview"
+
+
+def test_mock_client_emits_observability_when_enabled() -> None:
+    class _FakeSpan:
+        def __init__(self) -> None:
+            self.updates = []
+
+        def update(self, **kwargs) -> None:
+            self.updates.append(kwargs)
+
+    class _FakeObs:
+        def __init__(self) -> None:
+            self.recorded_span = _FakeSpan()
+
+        @contextmanager
+        def span(self, **_kwargs):
+            yield self.recorded_span
+
+    obs = _FakeObs()
+    client = MockLLMClient(observability=obs, capture_content=True)
+    output = client.complete(prompt="hello", model="gpt-4.1-mini")
+    assert output.startswith("[MOCK:gpt-4.1-mini]")
+    assert obs.recorded_span.updates
+    first_update = obs.recorded_span.updates[0]
+    assert "output" in first_update
+    assert first_update["output"]["output"] == output

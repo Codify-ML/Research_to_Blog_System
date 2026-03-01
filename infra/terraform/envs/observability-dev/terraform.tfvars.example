@@ -1,0 +1,59 @@
+aws_region  = "us-west-2"
+aws_profile = "personal-aws-dev"
+
+project_name = "vc-blog-agent"
+environment  = "dev"
+
+route53_zone_name = "dev.vc-projects-ds.com"
+route53_zone_id   = "Z03707592Y0NKCCWRSSFL"
+# Naming convention:
+# if project_name starts with "vc-", app_dns_prefix should be project_name
+# without that prefix (vc-blog-agent -> blog-agent).
+app_dns_prefix    = "blog-agent"
+langfuse_dns_label = "langfuse"
+# Optional full override:
+# langfuse_hostname = "langfuse.blog-agent.dev.vc-projects-ds.com"
+
+# Two-step rollout:
+# 1) keep false for first apply (secrets only)
+# 2) set true after pushing secret values to deploy web/worker compute
+enable_langfuse_compute = false
+enable_langfuse_auth    = true
+enable_https            = true
+log_retention_days      = 7
+
+langfuse_web_image    = "langfuse/langfuse:3"
+langfuse_worker_image = "langfuse/langfuse-worker:3"
+
+langfuse_web_desired_count    = 2
+langfuse_worker_desired_count = 1
+
+# App stack remote state reference for shared VPC and Cognito values.
+use_app_state      = true
+app_state_bucket   = "vc-tfstate-deploy-dev"
+app_state_key      = "projects/vc-blog-agent/terraform/state/dev.tfstate"
+app_state_region   = "us-west-2"
+app_state_profile  = "personal-aws-dev"
+
+# Langfuse creates and manages its own Cognito app client for ALB auth.
+# Optional override variable is available in variables.tf but normally unset.
+
+langfuse_auth_disable_signup = true
+langfuse_telemetry_enabled   = false
+langfuse_init_project_name   = "vc-blog-agent-observability"
+# Optional fixed project id for bootstrap init:
+# langfuse_init_project_id = "project_xxxxx"
+enable_langfuse_bootstrap_init = false
+# Required only when enable_langfuse_bootstrap_init=true:
+# langfuse_init_org_id = "org_xxxxx"
+
+# Optional overrides. Leave empty to use auto-generated bucket names.
+langfuse_event_bucket_name = ""
+langfuse_media_bucket_name = ""
+langfuse_s3_retention_days = 7
+
+langfuse_clickhouse_user            = "default"
+langfuse_clickhouse_password        = "langfuse"
+langfuse_clickhouse_db              = "default"
+langfuse_clickhouse_cluster_enabled = false
+langfuse_s3_force_path_style        = false

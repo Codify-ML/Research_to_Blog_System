@@ -3,6 +3,9 @@
 This directory contains the AWS infrastructure definition for the
 Research-to-Blog system.
 
+For full deployment steps (local, cloud, CI), see:
+- `docs/deployment_runbook.md`
+
 ## Cloud System Diagram
 
 ```mermaid
@@ -29,11 +32,14 @@ flowchart LR
 ## Layout
 
 - `envs/dev`: environment root module and backend config.
+- `envs/observability-dev`: separate Langfuse cloud stack (own state key).
 - `modules/network`: VPC, subnets, routing.
 - `modules/security`: security groups and ECS IAM roles.
 - `modules/data`: RDS Postgres and ElastiCache Redis.
 - `modules/compute`: ECS/Fargate services and ALBs.
-- `modules/secrets`: Secrets Manager secret for OpenAI key.
+- `modules/secrets`: app Secrets Manager entries (OpenAI, API key, Langfuse).
+- `modules/observability`: Langfuse ECS/ALB deployment module.
+- `modules/observability_secrets`: Langfuse Secrets Manager entries.
 - `modules/ecr`: ECR repositories for API, worker, and UI images.
 
 ## Backend (dev)
@@ -42,6 +48,13 @@ The `dev` environment is configured for S3 remote state with:
 
 - Bucket: `vc-tfstate-deploy-dev`
 - Key: `projects/vc-blog-agent/terraform/state/dev.tfstate`
+- Profile: `personal-aws-dev`
+- Locking: `use_lockfile = true`
+
+Observability (`observability-dev`) uses a separate state key:
+
+- Bucket: `vc-tfstate-deploy-dev`
+- Key: `projects/vc-blog-agent/terraform/state/observability-dev.tfstate`
 - Profile: `personal-aws-dev`
 - Locking: `use_lockfile = true`
 
@@ -57,6 +70,29 @@ make tf-plan-dev
 
 `make tf-init-dev`, `make tf-validate-dev`, and `make tf-plan-dev` do not
 apply changes. Run `make tf-apply-dev` only after reviewing the plan.
+
+Image tag handling for dev commands:
+- `make deploy-plan-dev`, `make deploy-dev`, `make tf-plan-dev`, and
+  `make tf-apply-dev` pass `-var=image_tag=$(IMAGE_TAG)`.
+- `IMAGE_TAG` defaults to the current git commit SHA (12 chars) to mirror CI.
+- `infra/terraform/envs/dev/terraform.tfvars` can keep `image_tag = "latest"`
+  as a fallback; command-line `-var` values take precedence.
+- Override manually only when needed, for example:
+  `IMAGE_TAG=<tag> make deploy-dev`.
+
+Observability stack commands:
+
+```bash
+make tf-init-obs-dev
+make tf-validate-obs-dev
+make tf-plan-obs-dev
+```
+
+Apply with:
+
+```bash
+make tf-apply-obs-dev
+```
 
 ## Hostname Configuration
 
@@ -112,6 +148,14 @@ during migration:
 The workflow `.github/workflows/build-and-push-images.yml` builds and pushes
 API/worker/UI images to ECR (`<project>-<env>-{api,worker,ui}`).
 
+Tag behavior in CI:
+- PR/non-main paths resolve `image_tag` to `${GITHUB_SHA::12}` and run
+  build/plan validation.
+- Main (and explicit feature deploy override) resolves `image_tag` to
+  `${GITHUB_SHA::12}` and runs full deploy.
+- Manual `workflow_dispatch` may pass an explicit `image_tag`; when omitted,
+  release defaults are used.
+
 Required GitHub Environment variables:
 - `AWS_REGION`
 - `AWS_ACCOUNT_ID`
@@ -131,9 +175,45 @@ Required GitHub Environment secrets:
 
 Optional GitHub Environment secret:
 - `AWS_ROLE_EXTERNAL_ID`
+- `LANGFUSE_PUBLIC_KEY` (if app tracing to Langfuse is enabled)
+- `LANGFUSE_SECRET_KEY` (if app tracing to Langfuse is enabled)
 
 ## Authentication Operations
 
 User onboarding, disable/enable, and access control steps are documented in:
 
 - `infra/terraform/authentication_runbook.md`
+
+Langfuse deployment and secrets bootstrap are documented in:
+
+- `infra/terraform/langfuse_deployment_runbook.md`
+
+## One-Command Bootstrap (Recommended)
+
+Use the bootstrap script to reduce manual setup drift across AWS Secrets
+Manager, GitHub Environment values, and Terraform tfvars files.
+
+1. Copy and fill the template:
+
+```bash
+cp ops/dev.bootstrap.env.example ops/dev.bootstrap.env
+```
+
+2. Dry-run the full workflow:
+
+```bash
+make bootstrap-dev-dry-run
+```
+
+3. Apply configuration sync:
+
+```bash
+make bootstrap-dev
+```
+
+4. Plan or apply both stacks in sequence (`observability-dev` then `dev`):
+
+```bash
+make bootstrap-dev-plan
+make bootstrap-dev-apply
+```
