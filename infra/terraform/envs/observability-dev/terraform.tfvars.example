@@ -35,6 +35,15 @@ langfuse_worker_memory            = "1024"
 langfuse_clickhouse_cpu           = "512"
 langfuse_clickhouse_memory        = "1024"
 
+# Optional scheduled scaling (business-hours up, off-hours down).
+enable_scheduled_scaling = false
+scheduled_scale_up_recurrence = "cron(0 8 ? * MON-FRI *)"
+scheduled_scale_down_recurrence = "cron(0 20 ? * MON-FRI *)"
+scheduled_scaling_timezone = "America/Los_Angeles"
+langfuse_web_offhours_count = 0
+langfuse_worker_offhours_count = 0
+langfuse_clickhouse_offhours_count = 0
+
 # App stack remote state reference for shared VPC and Cognito values.
 use_app_state      = true
 app_state_bucket   = "vc-tfstate-deploy-dev"

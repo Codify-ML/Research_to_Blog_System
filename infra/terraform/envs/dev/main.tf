@@ -299,6 +299,16 @@ module "compute" {
   enable_deployment_circuit_breaker = (
     var.enable_deployment_circuit_breaker
   )
+  enable_scheduled_scaling      = var.enable_scheduled_scaling
+  scheduled_scale_up_recurrence = var.scheduled_scale_up_recurrence
+  scheduled_scale_down_recurrence = (
+    var.scheduled_scale_down_recurrence
+  )
+  scheduled_scaling_timezone     = var.scheduled_scaling_timezone
+  api_offhours_count             = var.api_offhours_count
+  worker_offhours_count          = var.worker_offhours_count
+  ui_offhours_count              = var.ui_offhours_count
+  ui_logout_offhours_count       = var.ui_logout_offhours_count
   ui_cognito_hosted_ui_base      = "https://${aws_cognito_user_pool_domain.ui.domain}.auth.${var.aws_region}.amazoncognito.com"
   ui_public_base_url             = var.enable_https ? "https://${local.effective_ui_hostname}" : "http://${local.effective_ui_hostname}"
   enable_https                   = var.enable_https

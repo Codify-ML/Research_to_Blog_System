@@ -234,3 +234,39 @@ If you only want to remove Langfuse objects from S3 buckets:
 ```bash
 make obs-empty-s3-dev
 ```
+
+## 9) Phase 2 Cost Controls: Scheduled Scaling
+
+Scheduled scaling is implemented but disabled by default.
+
+### 9.1 App stack (`infra/terraform/envs/dev/terraform.tfvars`)
+
+```hcl
+enable_scheduled_scaling = true
+scheduled_scale_up_recurrence = "cron(0 8 ? * MON-FRI *)"
+scheduled_scale_down_recurrence = "cron(0 20 ? * MON-FRI *)"
+scheduled_scaling_timezone = "America/Los_Angeles"
+api_offhours_count = 0
+worker_offhours_count = 0
+ui_offhours_count = 0
+ui_logout_offhours_count = 0
+```
+
+### 9.2 Observability stack (`infra/terraform/envs/observability-dev/terraform.tfvars`)
+
+```hcl
+enable_scheduled_scaling = true
+scheduled_scale_up_recurrence = "cron(0 8 ? * MON-FRI *)"
+scheduled_scale_down_recurrence = "cron(0 20 ? * MON-FRI *)"
+scheduled_scaling_timezone = "America/Los_Angeles"
+langfuse_web_offhours_count = 0
+langfuse_worker_offhours_count = 0
+langfuse_clickhouse_offhours_count = 0
+```
+
+Apply after setting values:
+
+```bash
+make tf-apply-dev
+make tf-apply-obs-dev
+```

@@ -420,6 +420,15 @@ module "langfuse_compute" {
   enable_deployment_circuit_breaker = (
     var.enable_deployment_circuit_breaker
   )
+  enable_scheduled_scaling      = var.enable_scheduled_scaling
+  scheduled_scale_up_recurrence = var.scheduled_scale_up_recurrence
+  scheduled_scale_down_recurrence = (
+    var.scheduled_scale_down_recurrence
+  )
+  scheduled_scaling_timezone = var.scheduled_scaling_timezone
+  web_offhours_count         = var.langfuse_web_offhours_count
+  worker_offhours_count      = var.langfuse_worker_offhours_count
+  clickhouse_offhours_count  = var.langfuse_clickhouse_offhours_count
 
   database_url_secret_arn = module.langfuse_secrets.secret_arns["database_url"]
   salt_secret_arn         = module.langfuse_secrets.secret_arns["salt"]

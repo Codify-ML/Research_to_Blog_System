@@ -709,4 +709,130 @@ resource "aws_ecs_service" "clickhouse" {
   }
 }
 
+resource "aws_appautoscaling_target" "web" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.web.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.web_desired_count
+  max_capacity       = var.web_desired_count
+}
+
+resource "aws_appautoscaling_target" "worker" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.worker.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.worker_desired_count
+  max_capacity       = var.worker_desired_count
+}
+
+resource "aws_appautoscaling_target" "clickhouse" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.clickhouse.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.clickhouse_desired_count
+  max_capacity       = var.clickhouse_desired_count
+}
+
+resource "aws_appautoscaling_scheduled_action" "web_scale_up" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-lf-web-scale-up"
+  service_namespace  = aws_appautoscaling_target.web[0].service_namespace
+  resource_id        = aws_appautoscaling_target.web[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.web[0].scalable_dimension
+  schedule           = var.scheduled_scale_up_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.web_desired_count
+    max_capacity = var.web_desired_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "web_scale_down" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-lf-web-scale-down"
+  service_namespace  = aws_appautoscaling_target.web[0].service_namespace
+  resource_id        = aws_appautoscaling_target.web[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.web[0].scalable_dimension
+  schedule           = var.scheduled_scale_down_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.web_offhours_count
+    max_capacity = var.web_offhours_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "worker_scale_up" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-lf-worker-scale-up"
+  service_namespace  = aws_appautoscaling_target.worker[0].service_namespace
+  resource_id        = aws_appautoscaling_target.worker[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.worker[0].scalable_dimension
+  schedule           = var.scheduled_scale_up_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.worker_desired_count
+    max_capacity = var.worker_desired_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "worker_scale_down" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-lf-worker-scale-down"
+  service_namespace  = aws_appautoscaling_target.worker[0].service_namespace
+  resource_id        = aws_appautoscaling_target.worker[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.worker[0].scalable_dimension
+  schedule           = var.scheduled_scale_down_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.worker_offhours_count
+    max_capacity = var.worker_offhours_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "clickhouse_scale_up" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-lf-clickhouse-scale-up"
+  service_namespace  = aws_appautoscaling_target.clickhouse[0].service_namespace
+  resource_id        = aws_appautoscaling_target.clickhouse[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.clickhouse[0].scalable_dimension
+  schedule           = var.scheduled_scale_up_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.clickhouse_desired_count
+    max_capacity = var.clickhouse_desired_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "clickhouse_scale_down" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-lf-clickhouse-scale-down"
+  service_namespace  = aws_appautoscaling_target.clickhouse[0].service_namespace
+  resource_id        = aws_appautoscaling_target.clickhouse[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.clickhouse[0].scalable_dimension
+  schedule           = var.scheduled_scale_down_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.clickhouse_offhours_count
+    max_capacity = var.clickhouse_offhours_count
+  }
+}
+
 data "aws_region" "current" {}

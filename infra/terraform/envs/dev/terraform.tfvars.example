@@ -63,6 +63,16 @@ deployment_maximum_percent = 200
 enable_deployment_circuit_breaker = true
 ecr_image_retention_count = 10
 
+# Optional scheduled scaling (business-hours up, off-hours down).
+enable_scheduled_scaling = false
+scheduled_scale_up_recurrence = "cron(0 8 ? * MON-FRI *)"
+scheduled_scale_down_recurrence = "cron(0 20 ? * MON-FRI *)"
+scheduled_scaling_timezone = "America/Los_Angeles"
+api_offhours_count = 0
+worker_offhours_count = 0
+ui_offhours_count = 0
+ui_logout_offhours_count = 0
+
 # If left empty, Terraform composes image URIs from created ECR repos
 # using `image_tag`.
 api_image = ""

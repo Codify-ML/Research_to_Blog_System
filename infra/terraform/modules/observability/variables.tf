@@ -242,6 +242,48 @@ variable "enable_deployment_circuit_breaker" {
   default     = true
 }
 
+variable "enable_scheduled_scaling" {
+  description = "Enable scheduled up/down scaling for Langfuse ECS services."
+  type        = bool
+  default     = false
+}
+
+variable "scheduled_scale_up_recurrence" {
+  description = "Cron/Rate expression for Langfuse scheduled scale-up."
+  type        = string
+  default     = "cron(0 8 ? * MON-FRI *)"
+}
+
+variable "scheduled_scale_down_recurrence" {
+  description = "Cron/Rate expression for Langfuse scheduled scale-down."
+  type        = string
+  default     = "cron(0 20 ? * MON-FRI *)"
+}
+
+variable "scheduled_scaling_timezone" {
+  description = "IANA timezone used by Langfuse scheduled scaling."
+  type        = string
+  default     = "America/Los_Angeles"
+}
+
+variable "web_offhours_count" {
+  description = "Desired Langfuse web task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
+variable "worker_offhours_count" {
+  description = "Desired Langfuse worker task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
+variable "clickhouse_offhours_count" {
+  description = "Desired Langfuse ClickHouse task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
 variable "database_url_secret_arn" {
   description = "Secret ARN containing DATABASE_URL."
   type        = string

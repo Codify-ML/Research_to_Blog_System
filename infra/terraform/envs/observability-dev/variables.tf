@@ -245,6 +245,48 @@ variable "enable_deployment_circuit_breaker" {
   default     = true
 }
 
+variable "enable_scheduled_scaling" {
+  description = "Enable scheduled up/down scaling for observability ECS services."
+  type        = bool
+  default     = false
+}
+
+variable "scheduled_scale_up_recurrence" {
+  description = "Cron/Rate expression for observability scheduled scale-up."
+  type        = string
+  default     = "cron(0 8 ? * MON-FRI *)"
+}
+
+variable "scheduled_scale_down_recurrence" {
+  description = "Cron/Rate expression for observability scheduled scale-down."
+  type        = string
+  default     = "cron(0 20 ? * MON-FRI *)"
+}
+
+variable "scheduled_scaling_timezone" {
+  description = "IANA timezone used by observability scheduled scaling."
+  type        = string
+  default     = "America/Los_Angeles"
+}
+
+variable "langfuse_web_offhours_count" {
+  description = "Desired Langfuse web task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
+variable "langfuse_worker_offhours_count" {
+  description = "Desired Langfuse worker task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
+variable "langfuse_clickhouse_offhours_count" {
+  description = "Desired Langfuse ClickHouse task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
 variable "use_app_state" {
   description = "Read shared network and Cognito values from app state."
   type        = bool
