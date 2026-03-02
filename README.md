@@ -175,6 +175,11 @@ Operational endpoints:
 ## Cloud Deployment (AWS)
 Step-by-step deployment guide:
 - `docs/deployment_runbook.md`
+- Includes teardown guidance:
+  - destroy preview (`make tf-destroy-plan-all`)
+  - selective destroy (`make tf-destroy-dev`, `make tf-destroy-obs-dev`)
+  - full destroy guard (`make tf-destroy-all CONFIRM_DESTROY_ALL=true`)
+  - optional ECR image purge (`PURGE_ECR_ON_DESTROY=true`)
 
 Recommended bootstrap path:
 1. Copy and fill the bootstrap config:

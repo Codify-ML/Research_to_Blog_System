@@ -10,6 +10,7 @@
 	test-gate \
 	test-perf \
 	ecr-login-dev \
+	ecr-empty-dev \
 	image-build-dev \
 	image-push-dev \
 	deploy-plan-dev \
@@ -29,13 +30,19 @@
 	tf-validate-obs-dev \
 	tf-plan-obs-dev \
 	tf-apply-obs-dev \
+	tf-destroy-plan-obs-dev \
+	tf-destroy-obs-dev \
+	tf-destroy-plan-dev \
 	tf-destroy-dev \
+	tf-destroy-plan-all \
+	tf-destroy-all \
 	docker-up \
 	docker-down \
 	docker-logs \
 	docker-ps \
 	obs-up \
 	obs-down \
+	obs-empty-s3-dev \
 	obs-logs \
 	obs-ps \
 	obs-smoke \
@@ -90,6 +97,12 @@ CLOUD_ENV ?= dev
 IMAGE_PLATFORM ?= linux/amd64
 RELEASE_SERVICES ?= api,worker,ui
 SMOKE_LLM_MODE ?= mock
+# Optional: when true, destroy targets purge images in ECR repositories first.
+PURGE_ECR_ON_DESTROY ?= false
+# Optional: when true, observability destroy targets purge Langfuse S3 buckets first.
+PURGE_OBS_S3_ON_DESTROY ?= false
+# Derived dev ECR repository names for app services.
+DEV_ECR_REPOS := $(PROJECT_NAME)-$(CLOUD_ENV)-api $(PROJECT_NAME)-$(CLOUD_ENV)-worker $(PROJECT_NAME)-$(CLOUD_ENV)-ui
 # Align local release defaults with CI behavior (immutable commit tag).
 IMAGE_TAG ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo latest)
 RELEASE_CMD := uv run python scripts/release.py
@@ -151,6 +164,34 @@ ecr-login-dev: ## Authenticate Docker to the dev ECR registry.
 	AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
 		aws ecr get-login-password | docker login \
 		--username AWS --password-stdin "$$registry"
+
+ecr-empty-dev: ## Delete all images from dev ECR app repositories (api/worker/ui).
+	@set -eu; \
+	for repo in $(DEV_ECR_REPOS); do \
+		echo "Checking ECR repo: $$repo"; \
+		if ! AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
+			aws ecr describe-repositories --repository-names "$$repo" >/dev/null 2>&1; then \
+			echo "Skipping missing repository: $$repo"; \
+			continue; \
+		fi; \
+		tmp=$$(mktemp); \
+		AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
+			aws ecr list-images --repository-name "$$repo" \
+			--query 'imageIds' --output json > "$$tmp"; \
+		count=$$(AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
+			aws ecr list-images --repository-name "$$repo" \
+			--query 'length(imageIds)' --output text); \
+		if [ "$$count" = "0" ]; then \
+			echo "Repository already empty: $$repo"; \
+			rm -f "$$tmp"; \
+			continue; \
+		fi; \
+		echo "Deleting $$count image refs from $$repo"; \
+		AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
+			aws ecr batch-delete-image --repository-name "$$repo" \
+			--image-ids "file://$$tmp" >/dev/null; \
+		rm -f "$$tmp"; \
+	done
 
 image-build-dev: ## Build API/worker/UI images for dev.
 	$(RELEASE_CMD) build $(RELEASE_COMMON_ARGS)
@@ -233,8 +274,41 @@ tf-plan-obs-dev: ## Plan Terraform changes for observability dev.
 tf-apply-obs-dev: ## Apply Terraform changes for observability dev.
 	terraform -chdir=$(TF_OBS_DEV_DIR) apply -var-file=terraform.tfvars
 
-tf-destroy-dev: ## Destroy Terraform resources for dev.
+tf-destroy-plan-obs-dev: ## Show what observability-dev destroy would remove (no changes applied).
+	terraform -chdir=$(TF_OBS_DEV_DIR) plan -destroy -var-file=terraform.tfvars
+
+tf-destroy-obs-dev: ## Destroy observability-dev stack (optional: PURGE_OBS_S3_ON_DESTROY=true).
+	@if [ "$(PURGE_OBS_S3_ON_DESTROY)" = "true" ]; then \
+		echo "Purging Langfuse S3 buckets before observability destroy (PURGE_OBS_S3_ON_DESTROY=true)"; \
+		$(MAKE) obs-empty-s3-dev; \
+	else \
+		echo "Skipping Langfuse S3 purge. Set PURGE_OBS_S3_ON_DESTROY=true to empty buckets first."; \
+	fi
+	terraform -chdir=$(TF_OBS_DEV_DIR) destroy -var-file=terraform.tfvars
+
+tf-destroy-plan-dev: ## Show what dev destroy would remove (no changes applied).
+	terraform -chdir=$(TF_DEV_DIR) plan -destroy -var-file=terraform.tfvars
+
+tf-destroy-dev: ## Destroy dev stack (optional: PURGE_ECR_ON_DESTROY=true).
+	@if [ "$(PURGE_ECR_ON_DESTROY)" = "true" ]; then \
+		echo "Purging ECR images before destroy (PURGE_ECR_ON_DESTROY=true)"; \
+		$(MAKE) ecr-empty-dev; \
+	else \
+		echo "Skipping ECR purge. Set PURGE_ECR_ON_DESTROY=true to empty repos first."; \
+	fi
 	terraform -chdir=$(TF_DEV_DIR) destroy -var-file=terraform.tfvars
+
+tf-destroy-plan-all: ## Show what destroying observability-dev and dev would remove (no changes applied).
+	@$(MAKE) tf-destroy-plan-obs-dev
+	@$(MAKE) tf-destroy-plan-dev
+
+tf-destroy-all: ## Destroy obs+dev stacks (requires CONFIRM_DESTROY_ALL=true; optional PURGE_OBS_S3_ON_DESTROY/PURGE_ECR_ON_DESTROY=true).
+	@if [ "$(CONFIRM_DESTROY_ALL)" != "true" ]; then \
+		echo "Refusing destroy-all. Re-run with CONFIRM_DESTROY_ALL=true"; \
+		exit 1; \
+	fi
+	@$(MAKE) tf-destroy-obs-dev
+	@$(MAKE) tf-destroy-dev
 
 ##@ Docker
 docker-up: ## Start local Docker stack.
@@ -259,6 +333,28 @@ obs-up: ## Start separate Langfuse observability stack.
 
 obs-down: ## Stop separate Langfuse observability stack.
 	$(OBS_DOCKER_COMPOSE) down --remove-orphans
+
+obs-empty-s3-dev: ## Delete objects in Langfuse event/media S3 buckets from observability-dev outputs.
+	@set -eu; \
+	event_bucket=$$(terraform -chdir=$(TF_OBS_DEV_DIR) output -raw langfuse_event_bucket_name 2>/dev/null || true); \
+	media_bucket=$$(terraform -chdir=$(TF_OBS_DEV_DIR) output -raw langfuse_media_bucket_name 2>/dev/null || true); \
+	if [ -z "$$event_bucket" ] && [ -z "$$media_bucket" ]; then \
+		echo "No Langfuse S3 bucket outputs found in $(TF_OBS_DEV_DIR)."; \
+		echo "Run tf-init-obs-dev/tf-apply-obs-dev first or skip this step."; \
+		exit 0; \
+	fi; \
+	for bucket in $$event_bucket $$media_bucket; do \
+		[ -n "$$bucket" ] || continue; \
+		echo "Checking bucket: $$bucket"; \
+		if ! AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
+			aws s3api head-bucket --bucket "$$bucket" >/dev/null 2>&1; then \
+			echo "Skipping missing/inaccessible bucket: $$bucket"; \
+			continue; \
+		fi; \
+		echo "Deleting objects from s3://$$bucket"; \
+		AWS_PROFILE=$(AWS_PROFILE) AWS_REGION=$(AWS_REGION) \
+			aws s3 rm "s3://$$bucket" --recursive >/dev/null || true; \
+	done
 
 obs-logs: ## Tail Langfuse observability stack logs.
 	$(OBS_DOCKER_COMPOSE) logs -f --tail=200
