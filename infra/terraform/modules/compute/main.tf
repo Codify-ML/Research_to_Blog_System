@@ -367,8 +367,8 @@ resource "aws_ecs_task_definition" "api" {
   family                   = "${var.name_prefix}-api"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "1024"
-  memory                   = "2048"
+  cpu                      = var.api_task_cpu
+  memory                   = var.api_task_memory
   execution_role_arn       = var.task_execution_role_arn
   task_role_arn            = var.task_role_arn
 
@@ -406,8 +406,8 @@ resource "aws_ecs_task_definition" "worker" {
   family                   = "${var.name_prefix}-worker"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "1024"
-  memory                   = "2048"
+  cpu                      = var.worker_task_cpu
+  memory                   = var.worker_task_memory
   execution_role_arn       = var.task_execution_role_arn
   task_role_arn            = var.task_role_arn
 
@@ -440,8 +440,8 @@ resource "aws_ecs_task_definition" "ui" {
   family                   = "${var.name_prefix}-ui"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"
-  memory                   = "1024"
+  cpu                      = var.ui_task_cpu
+  memory                   = var.ui_task_memory
   execution_role_arn       = var.task_execution_role_arn
   task_role_arn            = var.task_role_arn
 
@@ -473,8 +473,8 @@ resource "aws_ecs_task_definition" "ui_logout" {
   family                   = "${var.name_prefix}-ui-logout"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = var.ui_logout_task_cpu
+  memory                   = var.ui_logout_task_memory
   execution_role_arn       = var.task_execution_role_arn
   task_role_arn            = var.task_role_arn
 

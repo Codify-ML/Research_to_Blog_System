@@ -14,3 +14,14 @@ variable "scan_on_push" {
   type        = bool
   default     = true
 }
+
+variable "image_retention_count" {
+  description = "Number of most recent images to retain per repository."
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.image_retention_count >= 1
+    error_message = "image_retention_count must be at least 1."
+  }
+}

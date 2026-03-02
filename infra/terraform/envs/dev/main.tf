@@ -75,7 +75,8 @@ module "secrets" {
 module "ecr" {
   source = "../../modules/ecr"
 
-  name_prefix = local.name_prefix
+  name_prefix           = local.name_prefix
+  image_retention_count = var.ecr_image_retention_count
 }
 
 resource "aws_acm_certificate" "app" {
@@ -283,6 +284,14 @@ module "compute" {
   worker_desired_count    = var.worker_desired_count
   ui_desired_count        = var.ui_desired_count
   ui_logout_desired_count = var.ui_logout_desired_count
+  api_task_cpu            = var.api_task_cpu
+  api_task_memory         = var.api_task_memory
+  worker_task_cpu         = var.worker_task_cpu
+  worker_task_memory      = var.worker_task_memory
+  ui_task_cpu             = var.ui_task_cpu
+  ui_task_memory          = var.ui_task_memory
+  ui_logout_task_cpu      = var.ui_logout_task_cpu
+  ui_logout_task_memory   = var.ui_logout_task_memory
   deployment_minimum_healthy_percent = (
     var.deployment_minimum_healthy_percent
   )

@@ -91,13 +91,55 @@ variable "langfuse_worker_image" {
 variable "langfuse_web_desired_count" {
   description = "Desired count for Langfuse web service."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "langfuse_worker_desired_count" {
   description = "Desired count for Langfuse worker service."
   type        = number
   default     = 1
+}
+
+variable "langfuse_clickhouse_desired_count" {
+  description = "Desired count for internal ClickHouse service."
+  type        = number
+  default     = 1
+}
+
+variable "langfuse_web_cpu" {
+  description = "Fargate CPU units for Langfuse web service."
+  type        = string
+  default     = "512"
+}
+
+variable "langfuse_web_memory" {
+  description = "Fargate memory (MiB) for Langfuse web service."
+  type        = string
+  default     = "1024"
+}
+
+variable "langfuse_worker_cpu" {
+  description = "Fargate CPU units for Langfuse worker service."
+  type        = string
+  default     = "512"
+}
+
+variable "langfuse_worker_memory" {
+  description = "Fargate memory (MiB) for Langfuse worker service."
+  type        = string
+  default     = "1024"
+}
+
+variable "langfuse_clickhouse_cpu" {
+  description = "Fargate CPU units for Langfuse ClickHouse service."
+  type        = string
+  default     = "512"
+}
+
+variable "langfuse_clickhouse_memory" {
+  description = "Fargate memory (MiB) for Langfuse ClickHouse service."
+  type        = string
+  default     = "1024"
 }
 
 variable "langfuse_auth_disable_signup" {
