@@ -75,7 +75,8 @@ module "secrets" {
 module "ecr" {
   source = "../../modules/ecr"
 
-  name_prefix = local.name_prefix
+  name_prefix           = local.name_prefix
+  image_retention_count = var.ecr_image_retention_count
 }
 
 resource "aws_acm_certificate" "app" {
@@ -283,6 +284,14 @@ module "compute" {
   worker_desired_count    = var.worker_desired_count
   ui_desired_count        = var.ui_desired_count
   ui_logout_desired_count = var.ui_logout_desired_count
+  api_task_cpu            = var.api_task_cpu
+  api_task_memory         = var.api_task_memory
+  worker_task_cpu         = var.worker_task_cpu
+  worker_task_memory      = var.worker_task_memory
+  ui_task_cpu             = var.ui_task_cpu
+  ui_task_memory          = var.ui_task_memory
+  ui_logout_task_cpu      = var.ui_logout_task_cpu
+  ui_logout_task_memory   = var.ui_logout_task_memory
   deployment_minimum_healthy_percent = (
     var.deployment_minimum_healthy_percent
   )
@@ -290,6 +299,16 @@ module "compute" {
   enable_deployment_circuit_breaker = (
     var.enable_deployment_circuit_breaker
   )
+  enable_scheduled_scaling      = var.enable_scheduled_scaling
+  scheduled_scale_up_recurrence = var.scheduled_scale_up_recurrence
+  scheduled_scale_down_recurrence = (
+    var.scheduled_scale_down_recurrence
+  )
+  scheduled_scaling_timezone     = var.scheduled_scaling_timezone
+  api_offhours_count             = var.api_offhours_count
+  worker_offhours_count          = var.worker_offhours_count
+  ui_offhours_count              = var.ui_offhours_count
+  ui_logout_offhours_count       = var.ui_logout_offhours_count
   ui_cognito_hosted_ui_base      = "https://${aws_cognito_user_pool_domain.ui.domain}.auth.${var.aws_region}.amazoncognito.com"
   ui_public_base_url             = var.enable_https ? "https://${local.effective_ui_hostname}" : "http://${local.effective_ui_hostname}"
   enable_https                   = var.enable_https

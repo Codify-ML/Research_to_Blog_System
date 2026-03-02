@@ -367,8 +367,8 @@ resource "aws_ecs_task_definition" "api" {
   family                   = "${var.name_prefix}-api"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "1024"
-  memory                   = "2048"
+  cpu                      = var.api_task_cpu
+  memory                   = var.api_task_memory
   execution_role_arn       = var.task_execution_role_arn
   task_role_arn            = var.task_role_arn
 
@@ -406,8 +406,8 @@ resource "aws_ecs_task_definition" "worker" {
   family                   = "${var.name_prefix}-worker"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "1024"
-  memory                   = "2048"
+  cpu                      = var.worker_task_cpu
+  memory                   = var.worker_task_memory
   execution_role_arn       = var.task_execution_role_arn
   task_role_arn            = var.task_role_arn
 
@@ -440,8 +440,8 @@ resource "aws_ecs_task_definition" "ui" {
   family                   = "${var.name_prefix}-ui"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "512"
-  memory                   = "1024"
+  cpu                      = var.ui_task_cpu
+  memory                   = var.ui_task_memory
   execution_role_arn       = var.task_execution_role_arn
   task_role_arn            = var.task_role_arn
 
@@ -473,8 +473,8 @@ resource "aws_ecs_task_definition" "ui_logout" {
   family                   = "${var.name_prefix}-ui-logout"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = var.ui_logout_task_cpu
+  memory                   = var.ui_logout_task_memory
   execution_role_arn       = var.task_execution_role_arn
   task_role_arn            = var.task_role_arn
 
@@ -622,6 +622,174 @@ resource "aws_ecs_service" "ui_logout" {
     target_group_arn = aws_lb_target_group.ui_logout.arn
     container_name   = "ui-logout"
     container_port   = 8600
+  }
+}
+
+resource "aws_appautoscaling_target" "api" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.api.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.api_desired_count
+  max_capacity       = var.api_desired_count
+}
+
+resource "aws_appautoscaling_target" "worker" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.worker.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.worker_desired_count
+  max_capacity       = var.worker_desired_count
+}
+
+resource "aws_appautoscaling_target" "ui" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.ui.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.ui_desired_count
+  max_capacity       = var.ui_desired_count
+}
+
+resource "aws_appautoscaling_target" "ui_logout" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  service_namespace  = "ecs"
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.ui_logout.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  min_capacity       = var.ui_logout_desired_count
+  max_capacity       = var.ui_logout_desired_count
+}
+
+resource "aws_appautoscaling_scheduled_action" "api_scale_up" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-api-scale-up"
+  service_namespace  = aws_appautoscaling_target.api[0].service_namespace
+  resource_id        = aws_appautoscaling_target.api[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.api[0].scalable_dimension
+  schedule           = var.scheduled_scale_up_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.api_desired_count
+    max_capacity = var.api_desired_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "api_scale_down" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-api-scale-down"
+  service_namespace  = aws_appautoscaling_target.api[0].service_namespace
+  resource_id        = aws_appautoscaling_target.api[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.api[0].scalable_dimension
+  schedule           = var.scheduled_scale_down_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.api_offhours_count
+    max_capacity = var.api_offhours_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "worker_scale_up" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-worker-scale-up"
+  service_namespace  = aws_appautoscaling_target.worker[0].service_namespace
+  resource_id        = aws_appautoscaling_target.worker[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.worker[0].scalable_dimension
+  schedule           = var.scheduled_scale_up_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.worker_desired_count
+    max_capacity = var.worker_desired_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "worker_scale_down" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-worker-scale-down"
+  service_namespace  = aws_appautoscaling_target.worker[0].service_namespace
+  resource_id        = aws_appautoscaling_target.worker[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.worker[0].scalable_dimension
+  schedule           = var.scheduled_scale_down_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.worker_offhours_count
+    max_capacity = var.worker_offhours_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "ui_scale_up" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-ui-scale-up"
+  service_namespace  = aws_appautoscaling_target.ui[0].service_namespace
+  resource_id        = aws_appautoscaling_target.ui[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.ui[0].scalable_dimension
+  schedule           = var.scheduled_scale_up_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.ui_desired_count
+    max_capacity = var.ui_desired_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "ui_scale_down" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-ui-scale-down"
+  service_namespace  = aws_appautoscaling_target.ui[0].service_namespace
+  resource_id        = aws_appautoscaling_target.ui[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.ui[0].scalable_dimension
+  schedule           = var.scheduled_scale_down_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.ui_offhours_count
+    max_capacity = var.ui_offhours_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "ui_logout_scale_up" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-ui-logout-scale-up"
+  service_namespace  = aws_appautoscaling_target.ui_logout[0].service_namespace
+  resource_id        = aws_appautoscaling_target.ui_logout[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.ui_logout[0].scalable_dimension
+  schedule           = var.scheduled_scale_up_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.ui_logout_desired_count
+    max_capacity = var.ui_logout_desired_count
+  }
+}
+
+resource "aws_appautoscaling_scheduled_action" "ui_logout_scale_down" {
+  count = var.enable_scheduled_scaling ? 1 : 0
+
+  name               = "${var.name_prefix}-ui-logout-scale-down"
+  service_namespace  = aws_appautoscaling_target.ui_logout[0].service_namespace
+  resource_id        = aws_appautoscaling_target.ui_logout[0].resource_id
+  scalable_dimension = aws_appautoscaling_target.ui_logout[0].scalable_dimension
+  schedule           = var.scheduled_scale_down_recurrence
+  timezone           = var.scheduled_scaling_timezone
+
+  scalable_target_action {
+    min_capacity = var.ui_logout_offhours_count
+    max_capacity = var.ui_logout_offhours_count
   }
 }
 

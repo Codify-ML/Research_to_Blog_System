@@ -25,8 +25,24 @@ log_retention_days      = 7
 langfuse_web_image    = "langfuse/langfuse:3"
 langfuse_worker_image = "langfuse/langfuse-worker:3"
 
-langfuse_web_desired_count    = 2
+langfuse_web_desired_count    = 1
 langfuse_worker_desired_count = 1
+langfuse_clickhouse_desired_count = 1
+langfuse_web_cpu                  = "512"
+langfuse_web_memory               = "1024"
+langfuse_worker_cpu               = "512"
+langfuse_worker_memory            = "1024"
+langfuse_clickhouse_cpu           = "512"
+langfuse_clickhouse_memory        = "1024"
+
+# Optional scheduled scaling (business-hours up, off-hours down).
+enable_scheduled_scaling = false
+scheduled_scale_up_recurrence = "cron(0 8 ? * MON-FRI *)"
+scheduled_scale_down_recurrence = "cron(0 20 ? * MON-FRI *)"
+scheduled_scaling_timezone = "America/Los_Angeles"
+langfuse_web_offhours_count = 0
+langfuse_worker_offhours_count = 0
+langfuse_clickhouse_offhours_count = 0
 
 # App stack remote state reference for shared VPC and Cognito values.
 use_app_state      = true

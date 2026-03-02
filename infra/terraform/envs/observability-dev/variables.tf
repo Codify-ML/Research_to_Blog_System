@@ -91,13 +91,55 @@ variable "langfuse_worker_image" {
 variable "langfuse_web_desired_count" {
   description = "Desired count for Langfuse web service."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "langfuse_worker_desired_count" {
   description = "Desired count for Langfuse worker service."
   type        = number
   default     = 1
+}
+
+variable "langfuse_clickhouse_desired_count" {
+  description = "Desired count for internal ClickHouse service."
+  type        = number
+  default     = 1
+}
+
+variable "langfuse_web_cpu" {
+  description = "Fargate CPU units for Langfuse web service."
+  type        = string
+  default     = "512"
+}
+
+variable "langfuse_web_memory" {
+  description = "Fargate memory (MiB) for Langfuse web service."
+  type        = string
+  default     = "1024"
+}
+
+variable "langfuse_worker_cpu" {
+  description = "Fargate CPU units for Langfuse worker service."
+  type        = string
+  default     = "512"
+}
+
+variable "langfuse_worker_memory" {
+  description = "Fargate memory (MiB) for Langfuse worker service."
+  type        = string
+  default     = "1024"
+}
+
+variable "langfuse_clickhouse_cpu" {
+  description = "Fargate CPU units for Langfuse ClickHouse service."
+  type        = string
+  default     = "512"
+}
+
+variable "langfuse_clickhouse_memory" {
+  description = "Fargate memory (MiB) for Langfuse ClickHouse service."
+  type        = string
+  default     = "1024"
 }
 
 variable "langfuse_auth_disable_signup" {
@@ -201,6 +243,48 @@ variable "enable_deployment_circuit_breaker" {
   description = "Enable ECS circuit breaker rollback."
   type        = bool
   default     = true
+}
+
+variable "enable_scheduled_scaling" {
+  description = "Enable scheduled up/down scaling for observability ECS services."
+  type        = bool
+  default     = false
+}
+
+variable "scheduled_scale_up_recurrence" {
+  description = "Cron/Rate expression for observability scheduled scale-up."
+  type        = string
+  default     = "cron(0 8 ? * MON-FRI *)"
+}
+
+variable "scheduled_scale_down_recurrence" {
+  description = "Cron/Rate expression for observability scheduled scale-down."
+  type        = string
+  default     = "cron(0 20 ? * MON-FRI *)"
+}
+
+variable "scheduled_scaling_timezone" {
+  description = "IANA timezone used by observability scheduled scaling."
+  type        = string
+  default     = "America/Los_Angeles"
+}
+
+variable "langfuse_web_offhours_count" {
+  description = "Desired Langfuse web task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
+variable "langfuse_worker_offhours_count" {
+  description = "Desired Langfuse worker task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
+variable "langfuse_clickhouse_offhours_count" {
+  description = "Desired Langfuse ClickHouse task count during scheduled off-hours."
+  type        = number
+  default     = 0
 }
 
 variable "use_app_state" {

@@ -277,25 +277,79 @@ variable "image_tag" {
 variable "api_desired_count" {
   description = "Desired number of API tasks."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "worker_desired_count" {
   description = "Desired number of worker tasks."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "ui_desired_count" {
   description = "Desired number of UI tasks."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "ui_logout_desired_count" {
   description = "Desired number of UI logout tasks."
   type        = number
-  default     = 2
+  default     = 1
+}
+
+variable "api_task_cpu" {
+  description = "Fargate CPU units for API task."
+  type        = string
+  default     = "512"
+}
+
+variable "api_task_memory" {
+  description = "Fargate memory (MiB) for API task."
+  type        = string
+  default     = "1024"
+}
+
+variable "worker_task_cpu" {
+  description = "Fargate CPU units for worker task."
+  type        = string
+  default     = "512"
+}
+
+variable "worker_task_memory" {
+  description = "Fargate memory (MiB) for worker task."
+  type        = string
+  default     = "1024"
+}
+
+variable "ui_task_cpu" {
+  description = "Fargate CPU units for UI task."
+  type        = string
+  default     = "512"
+}
+
+variable "ui_task_memory" {
+  description = "Fargate memory (MiB) for UI task."
+  type        = string
+  default     = "1024"
+}
+
+variable "ui_logout_task_cpu" {
+  description = "Fargate CPU units for UI logout task."
+  type        = string
+  default     = "256"
+}
+
+variable "ui_logout_task_memory" {
+  description = "Fargate memory (MiB) for UI logout task."
+  type        = string
+  default     = "512"
+}
+
+variable "ecr_image_retention_count" {
+  description = "Number of most recent images to retain per app ECR repository."
+  type        = number
+  default     = 10
 }
 
 variable "deployment_minimum_healthy_percent" {
@@ -314,6 +368,54 @@ variable "enable_deployment_circuit_breaker" {
   description = "Enable ECS deployment circuit breaker with rollback."
   type        = bool
   default     = true
+}
+
+variable "enable_scheduled_scaling" {
+  description = "Enable scheduled up/down scaling for app ECS services."
+  type        = bool
+  default     = false
+}
+
+variable "scheduled_scale_up_recurrence" {
+  description = "Cron/Rate expression for app stack scheduled scale-up."
+  type        = string
+  default     = "cron(0 8 ? * MON-FRI *)"
+}
+
+variable "scheduled_scale_down_recurrence" {
+  description = "Cron/Rate expression for app stack scheduled scale-down."
+  type        = string
+  default     = "cron(0 20 ? * MON-FRI *)"
+}
+
+variable "scheduled_scaling_timezone" {
+  description = "IANA timezone used by app stack scheduled scaling."
+  type        = string
+  default     = "America/Los_Angeles"
+}
+
+variable "api_offhours_count" {
+  description = "Desired API task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
+variable "worker_offhours_count" {
+  description = "Desired worker task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
+variable "ui_offhours_count" {
+  description = "Desired UI task count during scheduled off-hours."
+  type        = number
+  default     = 0
+}
+
+variable "ui_logout_offhours_count" {
+  description = "Desired UI logout task count during scheduled off-hours."
+  type        = number
+  default     = 0
 }
 
 variable "use_mock_llm" {

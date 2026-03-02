@@ -386,9 +386,16 @@ module "langfuse_compute" {
   )
   cognito_user_pool_domain = local.resolved_cognito_user_pool_domain
 
-  web_desired_count    = var.langfuse_web_desired_count
-  worker_desired_count = var.langfuse_worker_desired_count
-  log_retention_days   = var.log_retention_days
+  web_desired_count        = var.langfuse_web_desired_count
+  worker_desired_count     = var.langfuse_worker_desired_count
+  clickhouse_desired_count = var.langfuse_clickhouse_desired_count
+  web_cpu                  = var.langfuse_web_cpu
+  web_memory               = var.langfuse_web_memory
+  worker_cpu               = var.langfuse_worker_cpu
+  worker_memory            = var.langfuse_worker_memory
+  clickhouse_cpu           = var.langfuse_clickhouse_cpu
+  clickhouse_memory        = var.langfuse_clickhouse_memory
+  log_retention_days       = var.log_retention_days
 
   telemetry_enabled          = var.langfuse_telemetry_enabled
   auth_disable_signup        = var.langfuse_auth_disable_signup
@@ -413,6 +420,15 @@ module "langfuse_compute" {
   enable_deployment_circuit_breaker = (
     var.enable_deployment_circuit_breaker
   )
+  enable_scheduled_scaling      = var.enable_scheduled_scaling
+  scheduled_scale_up_recurrence = var.scheduled_scale_up_recurrence
+  scheduled_scale_down_recurrence = (
+    var.scheduled_scale_down_recurrence
+  )
+  scheduled_scaling_timezone = var.scheduled_scaling_timezone
+  web_offhours_count         = var.langfuse_web_offhours_count
+  worker_offhours_count      = var.langfuse_worker_offhours_count
+  clickhouse_offhours_count  = var.langfuse_clickhouse_offhours_count
 
   database_url_secret_arn = module.langfuse_secrets.secret_arns["database_url"]
   salt_secret_arn         = module.langfuse_secrets.secret_arns["salt"]

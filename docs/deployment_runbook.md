@@ -168,3 +168,105 @@ IMAGE_TAG=<known_good_sha> make deploy-dev
 make cloud-smoke
 ```
 
+## 8) Teardown and Cost Control
+
+Use these targets to safely inspect or remove cloud resources when not needed.
+
+### 8.1 Preview what would be destroyed (no deletion)
+```bash
+make tf-destroy-plan-obs-dev
+make tf-destroy-plan-dev
+make tf-destroy-plan-all
+```
+
+### 8.2 Destroy only observability stack
+```bash
+make tf-destroy-obs-dev
+```
+
+If destroy fails due to non-empty Langfuse S3 buckets, purge buckets first:
+
+```bash
+make tf-destroy-obs-dev PURGE_OBS_S3_ON_DESTROY=true
+```
+
+### 8.3 Destroy only app stack (dev)
+By default, ECR images are preserved.
+
+```bash
+make tf-destroy-dev
+```
+
+To purge app images in ECR before destroying:
+
+```bash
+make tf-destroy-dev PURGE_ECR_ON_DESTROY=true
+```
+
+### 8.4 Destroy both stacks
+Guarded to prevent accidental full teardown.
+
+```bash
+make tf-destroy-all CONFIRM_DESTROY_ALL=true
+```
+
+To also purge app ECR images:
+
+```bash
+make tf-destroy-all CONFIRM_DESTROY_ALL=true PURGE_ECR_ON_DESTROY=true
+```
+
+To purge both Langfuse S3 buckets and app ECR images:
+
+```bash
+make tf-destroy-all CONFIRM_DESTROY_ALL=true PURGE_OBS_S3_ON_DESTROY=true PURGE_ECR_ON_DESTROY=true
+```
+
+### 8.5 ECR-only cleanup
+If you only want to remove app images from ECR:
+
+```bash
+make ecr-empty-dev
+```
+
+If you only want to remove Langfuse objects from S3 buckets:
+
+```bash
+make obs-empty-s3-dev
+```
+
+## 9) Phase 2 Cost Controls: Scheduled Scaling
+
+Scheduled scaling is implemented but disabled by default.
+
+### 9.1 App stack (`infra/terraform/envs/dev/terraform.tfvars`)
+
+```hcl
+enable_scheduled_scaling = true
+scheduled_scale_up_recurrence = "cron(0 8 ? * MON-FRI *)"
+scheduled_scale_down_recurrence = "cron(0 20 ? * MON-FRI *)"
+scheduled_scaling_timezone = "America/Los_Angeles"
+api_offhours_count = 0
+worker_offhours_count = 0
+ui_offhours_count = 0
+ui_logout_offhours_count = 0
+```
+
+### 9.2 Observability stack (`infra/terraform/envs/observability-dev/terraform.tfvars`)
+
+```hcl
+enable_scheduled_scaling = true
+scheduled_scale_up_recurrence = "cron(0 8 ? * MON-FRI *)"
+scheduled_scale_down_recurrence = "cron(0 20 ? * MON-FRI *)"
+scheduled_scaling_timezone = "America/Los_Angeles"
+langfuse_web_offhours_count = 0
+langfuse_worker_offhours_count = 0
+langfuse_clickhouse_offhours_count = 0
+```
+
+Apply after setting values:
+
+```bash
+make tf-apply-dev
+make tf-apply-obs-dev
+```

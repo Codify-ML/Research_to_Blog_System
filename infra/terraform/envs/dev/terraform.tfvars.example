@@ -46,13 +46,32 @@ redis_parameter_group_family = "redis7"
 redis_maxmemory_policy = "noeviction"
 
 # ECS resiliency and rolling deployment safety.
-api_desired_count = 2
-worker_desired_count = 2
-ui_desired_count = 2
-ui_logout_desired_count = 2
+api_desired_count = 1
+worker_desired_count = 1
+ui_desired_count = 1
+ui_logout_desired_count = 1
+api_task_cpu = "512"
+api_task_memory = "1024"
+worker_task_cpu = "512"
+worker_task_memory = "1024"
+ui_task_cpu = "512"
+ui_task_memory = "1024"
+ui_logout_task_cpu = "256"
+ui_logout_task_memory = "512"
 deployment_minimum_healthy_percent = 100
 deployment_maximum_percent = 200
 enable_deployment_circuit_breaker = true
+ecr_image_retention_count = 10
+
+# Optional scheduled scaling (business-hours up, off-hours down).
+enable_scheduled_scaling = false
+scheduled_scale_up_recurrence = "cron(0 8 ? * MON-FRI *)"
+scheduled_scale_down_recurrence = "cron(0 20 ? * MON-FRI *)"
+scheduled_scaling_timezone = "America/Los_Angeles"
+api_offhours_count = 0
+worker_offhours_count = 0
+ui_offhours_count = 0
+ui_logout_offhours_count = 0
 
 # If left empty, Terraform composes image URIs from created ECR repos
 # using `image_tag`.
